@@ -118,27 +118,24 @@ maximizeOneSplit <- function(geneDf, epsA = 0.1, epsB = 0.1, epsD = 0.1, maxIt =
     # NB: values of a and b are not important currently since evaluated after d is set.
     # If ever change the order, fix this.
     a <- b <- runif(nrow(xDf), min = -1, max = 1)
-    aVal <- list(a)
-    bVal <- list(b)
-    dVal <- list(d)
+    aPrev <- a
+    bPrev <- b
+    dPrev <- d
     it <- 1
+    curSol <- 0
     repeat {
-        cat("Iteration: ", it, "\n")
+        cat("\tOne split iteration: ", it, "\n")
         curSol <- biClustMax.optim(xDf, yDf, d, a, b, lam)
-        aVal <- append(aVal, list(curSol$a))
-        bVal <- append(bVal, list(curSol$b))
-        dVal <- append(dVal, list(curSol$d))
 
-        cat ("\tdist: ",
-             dist(rbind(curSol$a, aVal[[it]]))[1], "\t",
-             dist(rbind(curSol$b, bVal[[it]]))[1], "\t",
-             dist(rbind(curSol$d, dVal[[it]]))[1], "\n")
-
-        if (dist(rbind(curSol$a, aVal[[it]]))[1] < epsA &
-            dist(rbind(curSol$b, bVal[[it]]))[1] < epsB &
-            dist(rbind(curSol$d, dVal[[it]]))[1] < epsD)
+        cat ("\t\tdist: ",
+             dist(rbind(curSol$a, aPrev))[1], "\t",
+             dist(rbind(curSol$b, bPrev))[1], "\t",
+             dist(rbind(curSol$d, dPrev))[1], "\n")
+        if (dist(rbind(curSol$a, aPrev))[1] < epsA &
+            dist(rbind(curSol$b, bPrev))[1] < epsB &
+            dist(rbind(curSol$d, dPrev))[1] < epsD)
         {
-            cat("Converged.\n")
+            cat("\tConverged.\n")
             break
         }
 
@@ -149,10 +146,34 @@ maximizeOneSplit <- function(geneDf, epsA = 0.1, epsB = 0.1, epsD = 0.1, maxIt =
             break
         }
     }
+    # NB: If there is something funky with the distribution of a and b, 
+    # check here... though this should work correctly
+    a <- rep.int(0, length(a))
+    b <- rep.int(0, length(b))
+    a[splitIdx[[1]]] <- curSol$a
+    b[splitIdx[[2]]] <- curSol$b
 
-    return(list(a = aVal, b = bVal, d = dVal, splitIdx = splitIdx))
+    return(list(a = a, b = b, d = curSol$d))
 }
 
+biclustering <- function(geneDf, nSamples = 100)
+{
+    it <- 1
+    aVal <- list()
+    bVal <- list()
+    dVal <- list()
+    while (it <= nSamples) 
+    {
+        cat("Biclustering iteration: ", it, "\n")
+        curSol <- maximizeOneSplit(geneDf)
+        aVal <- append(aVal, list(curSol$a))
+        bVal <- append(bVal, list(curSol$b))
+        dVal <- append(bVal, list(curSol$b))
+        it <- it + 1
+    }
+
+    return(a = aVal, b = bVal, d = dVal)
+}
 
 # load gene data supplied by Ben
 # data is loaded in gene.mat
@@ -272,3 +293,4 @@ testConstrOptim(meow2vec, 8, startVec)$par
 
 # driver
 sol <- maximizeOneSplit(rbind(X.mat.2, Y.mat.2))
+bcSol <- biclustering(rbind(X.mat.2, Y.mat.2), nSamples = 10)
