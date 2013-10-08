@@ -4,6 +4,32 @@
 # Lee et. al. package. Provides 'scca()'
 library(scca)
 
+debug(biClustMax.optim)
+undebug(biClustMax.optim)
+
+debug(NIPALS.sparse)
+undebug(NIPALS.sparse)
+
+debug(opt.cv.alt)
+undebug(opt.cv.alt)
+
+debug(scca)
+undebug(scca)
+
+##' Randomly splits indices if there are an even number
+##' 
+##' @param n the number of indices
+##' @returns a list with two disjoint sets of indices from 1 to n.
+splitEvenly <- function(n)
+{
+    if ( n %% 2 != 0)
+    {
+        stop("Not an even number of genes!")
+    }
+    sets <- split(sample.int(n), 1:2)
+    return(sets)
+}
+
 ##' One iteration of biclustering maximization. Takes the current values of 
 ##' d, a, b and if successful returns one iteration
 ##' 
@@ -38,7 +64,7 @@ biClustMax.optim <- function(xDf, yDf, d.start, a, b, lam, verbose = TRUE)
     q <- - 2 * as.numeric((a %*% xDf) * (b %*% yDf))
 
     if (verbose)
-        cat("Solving optimization program\n")
+        cat("Solving optimization of d\n")
 
     # lower bound is zero
     constrMat<- diag(length(q))
@@ -51,7 +77,8 @@ biClustMax.optim <- function(xDf, yDf, d.start, a, b, lam, verbose = TRUE)
                      -lam)
     objectiveFn <- function(d, qVec)
     {
-        sum(0.5 * d^2 * qVec)
+        # sum(0.5 * d^2 * qVec)
+        sum(d^2 * qVec)
     }
     optimRes <- constrOptim(d.start, objectiveFn, grad = NULL,
                             ui = constrMat, ci = constrLimit,
@@ -61,66 +88,69 @@ biClustMax.optim <- function(xDf, yDf, d.start, a, b, lam, verbose = TRUE)
     if (optimRes$convergence != 0)
     {
         warning("Error with convergence.\n", "\tError code: ", 
-                optimRes$convergence, "\tMessage: ", optimRes$message)
+                optimRes$convergence, "\tMessage: ", optimRes$message,
+                immediate = TRUE)
     }
 
     return(list(a = a, b = b, d = optimRes$par, q))
 }
 
 
-debug(biClustMax.optim)
-undebug(biClustMax.optim)
-
-debug(NIPALS.sparse)
-undebug(NIPALS.sparse)
-
-debug(opt.cv.alt)
-undebug(opt.cv.alt)
-
-debug(scca)
-undebug(scca)
-
-
-##' Randomly splits indices if there are an even number
-##' 
-##' @param n the number of indices
-##' @returns a list with two disjoint sets of indices from 1 to n.
-splitEvenly <- function(n)
-{
-    if ( n %% 2 != 0)
-    {
-        stop("Not an even number of genes!")
-    }
-    sets <- split(sample.int(n), 1:2)
-    return(sets)
-}
-
-
 ##' Driver function to find solution for 
-maximizeOneSplit <- function(geneDf)
+maximizeOneSplit <- function(geneDf, epsA = 0.1, epsB = 0.1, epsD = 0.1, maxIt = 100)
 {
-    ## TODO: write me! in particular, iterate and check all exceptions
     splitIdx <- splitEvenly(nrow(geneDf))
     xDf <- geneDf[splitIdx[[1]], ]
     yDf <- geneDf[splitIdx[[2]], ]
 
-    lam <- round(min(xDf) * .3)
+    lam <- round(min(dim(xDf)) * .3)
 
+    # randomly initialize d
     d <- 0
+    maxUnif <- 1
     repeat {
-        d <- runif(ncol(xDf))
+        d <- runif(ncol(xDf), max = maxUnif)
         if (sum(d) <= lam)
             break
+        else
+            maxUnif <- min(0.05, maxUnif - 0.05)
     }
-
-    # NB: values of a and b are not important currently since evaluated after
-    aVal <- list()
-    bVal <- list()
-    dVal <- list()
+    # NB: values of a and b are not important currently since evaluated after d is set.
+    # If ever change the order, fix this.
+    a <- b <- runif(nrow(xDf), min = -1, max = 1)
+    aVal <- list(a)
+    bVal <- list(b)
+    dVal <- list(d)
+    it <- 1
     repeat {
-        biClustMax(xDf, yDf, d, 1, 1, lam)
+        cat("Iteration: ", it, "\n")
+        curSol <- biClustMax.optim(xDf, yDf, d, a, b, lam)
+        aVal <- append(aVal, list(curSol$a))
+        bVal <- append(bVal, list(curSol$b))
+        dVal <- append(dVal, list(curSol$d))
 
+        cat ("\tdist: ",
+             dist(rbind(curSol$a, aVal[[it]]))[1], "\t",
+             dist(rbind(curSol$b, bVal[[it]]))[1], "\t",
+             dist(rbind(curSol$d, dVal[[it]]))[1], "\n")
+
+        if (dist(rbind(curSol$a, aVal[[it]]))[1] < epsA &
+            dist(rbind(curSol$b, bVal[[it]]))[1] < epsB &
+            dist(rbind(curSol$d, dVal[[it]]))[1] < epsD)
+        {
+            cat("Converged.\n")
+            break
+        }
+
+        it <- it + 1
+        if (it > maxIt)
+        {
+            cat("Warning: exceed maximum number of iterations (", maxIt, ")\n")
+            break
+        }
     }
+
+    return(list(a = aVal, b = bVal, d = dVal, splitIdx = splitIdx))
 }
 
 
@@ -238,3 +268,7 @@ testConstrOptim <- function(q, lam, startPos)
 }
 
 testConstrOptim(meow2vec, 8, startVec)$par
+
+
+# driver
+sol <- maximizeOneSplit(rbind(X.mat.2, Y.mat.2))
