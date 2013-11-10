@@ -3,6 +3,7 @@
 
 # Lee et. al. package. Provides 'scca()'
 library(scca)
+library(multicore)
 
 debug(biClustMax.optim)
 undebug(biClustMax.optim)
@@ -55,13 +56,18 @@ biClustMax.optim <- function(xDf, yDf, d.start, a, b, lam, verbose = TRUE)
     # First maximize a and b using SCCA
     sccaRes <- scca(as.matrix(xTilde), as.matrix(yTilde), 
                     nc = 1, 
-                    penalty = "HL",
-                    center = TRUE, scale = FALSE)
+                    penalty = "LASSO",
+                    center = TRUE, scale = TRUE)
     a <- as.numeric(sccaRes$A)
     b <- as.numeric(sccaRes$B)
 
+    # XXX: Possibly remove... Unsure if I should scale in this fashion
+    xDf <- scale(xDf)
+    yDf <- scale(yDf)
+
     # Now, maximize D using quadratic programming
-    q <- - 2 * as.numeric((a %*% xDf) * (b %*% yDf))
+    # q <- - 2 * as.numeric((a %*% xDf) * (b %*% yDf))
+    q <- -as.numeric((a %*% xDf) * (b %*% yDf))
 
     if (verbose)
         cat("Solving optimization of d\n")
@@ -81,6 +87,7 @@ biClustMax.optim <- function(xDf, yDf, d.start, a, b, lam, verbose = TRUE)
         sum(d^2 * qVec)
     }
     optimRes <- constrOptim(d.start, objectiveFn, grad = NULL,
+                            control = list(maxit = 10000),
                             ui = constrMat, ci = constrLimit,
                             qVec = q
                             )
@@ -97,13 +104,15 @@ biClustMax.optim <- function(xDf, yDf, d.start, a, b, lam, verbose = TRUE)
 
 
 ##' Driver function to find solution for 
-maximizeOneSplit <- function(geneDf, epsA = 0.1, epsB = 0.1, epsD = 0.1, maxIt = 100)
+maximizeOneSplit <- function(geneDf, lam, epsA = 0.1, epsB = 0.1, epsD = 0.1, maxIt = 100)
 {
     splitIdx <- splitEvenly(nrow(geneDf))
     xDf <- geneDf[splitIdx[[1]], ]
     yDf <- geneDf[splitIdx[[2]], ]
 
-    lam <- round(min(dim(xDf)) * .3)
+    # TODO: implement cross validation for lambda
+    # lam <- round(min(dim(xDf)) * .3)
+    # lam <- 20 * 2
 
     # randomly initialize d
     d <- 0
@@ -118,27 +127,26 @@ maximizeOneSplit <- function(geneDf, epsA = 0.1, epsB = 0.1, epsD = 0.1, maxIt =
     # NB: values of a and b are not important currently since evaluated after d is set.
     # If ever change the order, fix this.
     a <- b <- runif(nrow(xDf), min = -1, max = 1)
-    aPrev <- a
-    bPrev <- b
-    dPrev <- d
     it <- 1
     curSol <- 0
     repeat {
         cat("\tOne split iteration: ", it, "\n")
         curSol <- biClustMax.optim(xDf, yDf, d, a, b, lam)
-
         cat ("\t\tdist: ",
-             dist(rbind(curSol$a, aPrev))[1], "\t",
-             dist(rbind(curSol$b, bPrev))[1], "\t",
-             dist(rbind(curSol$d, dPrev))[1], "\n")
-        if (dist(rbind(curSol$a, aPrev))[1] < epsA &
-            dist(rbind(curSol$b, bPrev))[1] < epsB &
-            dist(rbind(curSol$d, dPrev))[1] < epsD)
+             dist(rbind(curSol$a, a))[1], "\t",
+             dist(rbind(curSol$b, b))[1], "\t",
+             dist(rbind(curSol$d, d))[1], "\n")
+        if (dist(rbind(curSol$a, a))[1] < epsA &
+            dist(rbind(curSol$b, b))[1] < epsB &
+            dist(rbind(curSol$d, d))[1] < epsD)
         {
             cat("\tConverged.\n")
             break
         }
 
+        a <- curSol$a
+        b <- curSol$b
+        d <- curSol$d
         it <- it + 1
         if (it > maxIt)
         {
@@ -148,13 +156,28 @@ maximizeOneSplit <- function(geneDf, epsA = 0.1, epsB = 0.1, epsD = 0.1, maxIt =
     }
     # NB: If there is something funky with the distribution of a and b, 
     # check here... though this should work correctly
-    a <- rep.int(0, length(a))
-    b <- rep.int(0, length(b))
-    a[splitIdx[[1]]] <- curSol$a
-    b[splitIdx[[2]]] <- curSol$b
+    # a <- rep.int(0, length(a))
+    # b <- rep.int(0, length(b))
+    ab <- rep.int(0, length(b*2))
+    ab[splitIdx[[1]]] <- curSol$a
+    ab[splitIdx[[2]]] <- curSol$b
+    # a[splitIdx[[1]]] <- curSol$a
+    # b[splitIdx[[2]]] <- curSol$b
 
-    return(list(a = a, b = b, d = curSol$d))
+    return(list(a = a, b = b, ab = ab, d = round(curSol$d, digits = 4),
+                splitIdx = splitIdx))
 }
+
+biclusteringPar <- function(geneDf, nSamples = 100, lam)
+{
+    mclapply(1:nSamples, function(it) {
+             cat("Biclustering iteration: ", it, "\n")
+             curSol <- maximizeOneSplit(geneDf, lam)
+             return(curSol)
+            #}, mc.silent = FALSE)
+            })
+}
+
 
 biclustering <- function(geneDf, nSamples = 100)
 {
@@ -162,17 +185,21 @@ biclustering <- function(geneDf, nSamples = 100)
     aVal <- list()
     bVal <- list()
     dVal <- list()
+    abVal <- list()
+    splitIdx <- list()
     while (it <= nSamples) 
     {
         cat("Biclustering iteration: ", it, "\n")
         curSol <- maximizeOneSplit(geneDf)
         aVal <- append(aVal, list(curSol$a))
         bVal <- append(bVal, list(curSol$b))
-        dVal <- append(bVal, list(curSol$b))
+        dVal <- append(dVal, list(curSol$d))
+        abVal <- append(abVal, list(curSol$ab))
+        splitIdx <- append(splitIdx, list(curSol$splitIdx))
         it <- it + 1
     }
 
-    return(a = aVal, b = bVal, d = dVal)
+    return(list(a = aVal, b = bVal, ab = abVal, d = dVal, splitIdx = splitIdx))
 }
 
 # load gene data supplied by Ben
@@ -188,32 +215,6 @@ Y.mat <- log(Y.mat)
 
 X.mat.2 <- X.mat[1:20, 1:10]
 Y.mat.2 <- Y.mat[1:20, 1:10]
-
-# testing one iteration of biclustering
-meow <- biClustMax(X.mat, Y.mat, 
-                   rep(1, ncol(gas.mat)),
-                   runif(length(hi[[1]]), min = -1, max = 1), 
-                   runif(length(hi[[1]]), min = -1, max = 1)
-                   )
-
-# testing one iteration of biclustering
-meow2 <- biClustMax(X.mat.2, Y.mat.2, 
-                   rep(1, ncol(X.mat.2)),
-                   runif(nrow(X.mat.2), min = -1, max = 1), 
-                   runif(nrow(Y.mat.2), min = -1, max = 1)
-                   )
-
-meow.nlminb <- biClustMax.nlminb(X.mat, Y.mat, 
-                                 runif(ncol(X.mat)),
-                                 runif(nrow(X.mat), min = -1, max = 1), 
-                                 runif(nrow(Y.mat), min = -1, max = 1)
-                                 )
-
-meow2.nlminb <- biClustMax(X.mat.2, Y.mat.2, 
-                           runif(ncol(X.mat.2)),
-                           runif(nrow(X.mat.2), min = -1, max = 1), 
-                           runif(nrow(Y.mat.2), min = -1, max = 1)
-                           )
 
 startVec <- runif(ncol(X.mat.2))
 
@@ -294,3 +295,5 @@ testConstrOptim(meow2vec, 8, startVec)$par
 # driver
 sol <- maximizeOneSplit(rbind(X.mat.2, Y.mat.2))
 bcSol <- biclustering(rbind(X.mat.2, Y.mat.2), nSamples = 10)
+
+# FIXME: Fix the way it returns... basically make sure return is correct

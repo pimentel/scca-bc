@@ -6,8 +6,8 @@ geneDataAdult <- geneData[, order(colnames(geneDataAdult))]
 gas <- geneDataAdult[, order(colnames(geneDataAdult))]
 gas.mat <- as.matrix(gas)
 
-d <- diag(runif(ncol(gas)))
-colnames(d) <- colnames(gas.mat)
+# d <- diag(runif(ncol(gas)))
+# colnames(d) <- colnames(gas.mat)
 
 
 
