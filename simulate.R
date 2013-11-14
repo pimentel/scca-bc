@@ -124,6 +124,7 @@ sumTest <- generateRandomBlock.sum(25 * 10, 5)
 sumTestMat <- matrix(sumTest$sample, nrow = 25, ncol = 10)
 cor(sumTestMat)
 
+# this is a basic additive model
 generateRandomBlock.clust <- function(nrow = 4, ncol = 5, nCoefficients = 5, 
                                       rowMean = 2, colMean = 1)
 {
@@ -439,3 +440,171 @@ cutree(aHclust, 2)
 
 
 load("~/tmp/bcSession.RData")
+
+
+# writing function to permute rows and columns before sending it off to BC
+permuteSim <- function(simDf)
+{
+    rowOrder <- sample(nrow(simDf))
+    colOrder <- sample(ncol(simDf))
+
+    return(list(rowOrder = rowOrder, colOrder = colOrder, permutedMat
+                = simDf[rowOrder, colOrder]))
+}
+
+# test using permuted sim
+addBlock <- generateRandomBlock.clust(25, 15)
+geneMatSim <- generateNormal(nrow = 220, ncol = 40, clusterOptions = 
+                             list(list(x.start = 1, x.end = 25, y.start = 1, y.end = 15,
+                                       data = addBlock$sample)))
+ps.geneMatSim <- permuteSim(geneMatSim)
+bc.oneAdd.200.15 <- biclusteringPar(ps.geneMatSim$permutedMat, 200, 15)
+
+bc.oneAdd.200.15.reorder <- reorderBCSol(bc.oneAdd.200.15, ps.geneMatSim)
+save(bc.oneAdd.200.15, bc.oneAdd.200.15.reorder, ps.geneMatSim, geneMatSim, 
+     file = "permuteSimTest.RData")
+
+load("permuteSimTest.RData")
+
+plotParSolution(bc.oneAdd.200.15)
+plotParSolution(bc.oneAdd.200.15.reorder)
+A <- sapply(bc.oneAdd.200.15.reorder, function(x) x$ab)
+cutree(hclust(dist(abs(A))), 2)
+
+reorderBCSol <- function(bcSol, ps)
+{
+    for (bcIt in 1:length(bcSol$allBcSol))
+    {
+        bcSol$allBcSol[[bcIt]] <- lapply(bcSol$allBcSol[[bcIt]], function(aSol) 
+                                         {
+                                             aSol$ab <- aSol$ab[order(ps$rowOrder)]
+                                             aSol$d <- aSol$d[order(ps$colOrder)]
+                                             return(aSol)
+                                         })
+    }
+
+    bcSol$clusters <- lapply(bcSol$clusters, function(clust)
+                             {
+                                 clust$rowIdx <- ps$rowOrder[clust$rowIdx]
+                                 clust$colIdx <- ps$colOrder[clust$colIdx]
+                                 return(clust)
+                             })
+
+    return(bcSol)
+}
+
+reorganizeSim <- function(psRes)
+{
+    psRes$permutedMat[order(psRes$rowOrder), order(psRes$colOrder)]
+}
+
+# testing permuteSim
+mat <- matrix(1:20, ncol = 5, byrow = TRUE)
+psMat <- permuteSim(mat)
+reorganizeSim(psMat)
+
+par(mfrow = c(2, 1))
+levelplot(geneMatSim)
+levelplot(permuteSim(geneMatSim)$permutedMat)
+
+
+block1 <- generateRandomBlock.clust()
+
+
+
+# testing finding multiple clusters
+regBlock <- generateRandomBlock.clust(25, 15)
+progRowsSamp <- generateRandomBlock.progRows(25, 15)
+geneMatSim <- generateNormal(nrow = 220, ncol = 40, clusterOptions = 
+                             list(list(x.start = 1, x.end = 25, y.start = 1, y.end = 15,
+                                       data = regBlock$sample),
+                                  list(x.start = 100, x.end = 124, y.start = 26, y.end = 40,
+                                       data = progRowsSamp$sample)))
+ps.geneMatSim <- permuteSim(geneMatSim)
+bc.oneProgOneAdd.200.15 <- bcMultipleClusters(ps.geneMatSim$permutedMat, 15, 2, 200)
+
+bc.oneProgOneAdd.200.15.reorder <- reorderBCSol(bc.oneProgOneAdd.200.15, ps.geneMatSim) 
+save(geneMatSim, ps.geneMatSim, bc.oneProgOneAdd.200.15, bc.oneProgOneAdd.200.15.reorder,
+     file = "bc.oneProgOneAdd.200.15.RData")
+
+load("bc.oneProgOneAdd.200.15.RData")
+plotParSolution(bc.oneProgOneAdd.200.15.reorder$allBcSol[[2]])
+
+bc.oneProgOneAdd.200.15.reorder$allBcSol[[2]]$clusters
+
+
+# evaluate how good the simulation is doing
+# truth and pred are lists of lists. Each index in the list corresponds to a list with:
+# G: the set of genes
+# C: the set of conditions
+amrs <- function(truthList, predList)
+{
+    mean(sapply(truthList, function(truth)
+           {
+               max(sapply(predList, function(prediction)
+                      {
+                          numerator <- length(intersect(truth$G, prediction$G)) 
+                          denominator <- length(union(truth$G, prediction$G))
+                          numerator / denominator
+                      }))
+           }))
+}
+
+
+# check how well you do on every cell
+amrs.hp <- function(truthList, predList)
+{
+    expandCells <- function(aList)
+    {
+        aCat <- expand.grid(aList$G, aList$C)
+        paste(aCat[,1], aCat[,2], sep = ".")
+    }
+    mean(sapply(truthList, function(truth)
+           {
+               truthCat <- expandCells(truth)
+               max(sapply(predList, function(prediction)
+                      {
+                          predCat <- expandCells(prediction)
+                          numerator <- length(intersect(truthCat, predCat)) 
+                          denominator <- length(union(truthCat, predCat))
+                          numerator / denominator
+                      }))
+           }))
+}
+
+
+# check how well you do on genes then on conditions
+amrs.hp2 <- function(truthList, predList)
+{
+    mean(sapply(truthList, function(truth)
+           {
+               max(sapply(predList, function(prediction)
+                      {
+                          #predCat <- expandCells(prediction)
+                          numerator <- length(intersect(truth$G, prediction$G))  
+                          numerator <- numerator + length(intersect(truth$C, prediction$C))
+                          denominator <- length(union(truth$G, prediction$G))
+                          denominator <- denominator + length(union(truth$C, prediction$C))
+                          numerator / denominator
+                      }))
+           }))
+}
+
+t.amrs.truth <- list(list(G = 1:10, C = 2:4),
+                     list(G = 5:20, C = 3:10))
+t.amrs.pred <- list(list(G = 1:9, C = 2:4),
+                    list(G = c(5, 7, 14:18), C = 3:9))
+
+amrs(t.amrs.truth, t.amrs.pred)
+amrs(t.amrs.truth, t.amrs.truth)
+amrs(t.amrs.pred, t.amrs.truth)
+
+
+amrs.hp(t.amrs.truth, t.amrs.pred)
+amrs.hp(t.amrs.truth, t.amrs.truth)
+amrs.hp(t.amrs.pred, t.amrs.truth)
+
+amrs.hp2(t.amrs.truth, t.amrs.pred)
+amrs.hp2(t.amrs.truth, t.amrs.truth)
+amrs.hp2(t.amrs.pred, t.amrs.truth)
+

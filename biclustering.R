@@ -168,17 +168,89 @@ maximizeOneSplit <- function(geneDf, lam, epsA = 0.1, epsB = 0.1, epsD = 0.1, ma
                 splitIdx = splitIdx))
 }
 
+
+#' Given a set of features, will find the most "dominant" bicluster. Works in
+#' parallel using library "multicore." To set the number of cores used, set
+#' options(cores = N).
+#' @param geneDf data.frame with genes on rows and columns defining conditions
+#' @param nSamples integer denoting the number of permutations to perform
+#' @param lam regularization parameter for conditions (maximum number of conditions allows in a bicluster)
 biclusteringPar <- function(geneDf, nSamples = 100, lam)
 {
     mclapply(1:nSamples, function(it) {
              cat("Biclustering iteration: ", it, "\n")
              curSol <- maximizeOneSplit(geneDf, lam)
              return(curSol)
-            #}, mc.silent = FALSE)
             })
 }
 
 
+bcMultipleClusters <- function(geneDf, lam, nClusters, nSamples = 100)
+{
+    allBcSol <- list()
+    clusters <- list()
+    for (clust in 1:nClusters)
+    {
+        bcSol <- biclusteringPar(geneDf, nSamples, lam)
+        allBcSol <- append(allBcSol, list(bcSol))
+
+        # Take abs() of A since depending on partition, correlation could be in
+        # opposite direction
+        A <- abs(sapply(bcSol, function(x) x$ab))
+        D <- sapply(bcSol, function(x) x$d)
+
+        # find features/conditions which are clustered
+        # to find the cluster, find cut with fewest elements...  
+
+        # XXX: this is not necessarily correct. For example, it is *possible*
+        # that a cluster might contain more than half of the genes and only
+        # a few conditions.  Think about a "better" way to do this... i.e.
+        # perhaps a matrix multiplication
+
+        # returns which indices correspond to a cluster
+        # TODO: fix this to get the cluster with the most non-zero entries
+        cutHCluster <- function(mat)
+        {
+            hc <- hclust(dist(mat))
+            hcCuts <- cutree(hc, 2)
+
+            cutIdx <- 1
+            if (mean(hcCuts == 1) > 0.5)
+            {
+                cutIdx <- 2
+            }
+            cutIdx <- which(hcCuts == cutIdx)
+            return(cutIdx)
+        }
+
+        rowIdx <- cutHCluster(A)
+        colIdx <- cutHCluster(D)
+
+        clusters <- append(clusters, list(list(rowIdx = rowIdx, colIdx = colIdx)))
+
+        # given a list of rows and columns, converts pairwise combinations into
+        # 1D index for matrix
+        get1DIdx <- function(rows, cols) 
+        {
+            allPairs <- expand.grid(rows, cols)
+            nrow(geneDf) * (allPairs[, 2] - 1) + allPairs[, 1]
+        }
+
+        # mask each gene with random values from the rest of the matrix also
+        # considered doing this with JUST the other values of the gene... need
+        # to experiment with that
+        clustIdx <- get1DIdx(rowIdx, colIdx)
+        # geneDf[clustIdx] <- sample(geneDf[-clustIdx], length(clustIdx))
+        # temporarily sample rnorm to debug FP issue
+        geneDf[clustIdx] <- rnorm(length(clustIdx))
+    }
+
+    return(list(allBcSol = allBcSol, clusters = clusters))
+}
+
+
+
+#' XXX: OBSOLETE! This is mostly still here for testing... 
 biclustering <- function(geneDf, nSamples = 100)
 {
     it <- 1
