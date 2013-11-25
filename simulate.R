@@ -2,6 +2,7 @@
 library(mvtnorm)
 library(lattice)
 library(gplots)
+library(clusterGeneration) #genPositiveDefMat
 # library(MASS)
 
 ##' Function to generate normal noise and Gaussian blocks
@@ -50,6 +51,23 @@ generateRandomBlock <- function(nGenes = 4)
     return(list(sample = rmvnorm(1, mean = rep(0, nGenes), sigma = sig, method = "svd"), sigma = sig))
 }
 
+debug(generateRandomBlock)
+generateRandomBlock(40)
+
+genRanPosDefMat <- function(nGenes = 10, min = 0.5, max = 0.8)
+{
+    correlations <- round(runif(round((nGenes^2-nGenes)/2), 
+                                min = min, max = max), digits = 2)
+    # correlations <- sample(c(1, -1), length(correlations), replace = TRUE) * correlations
+    sig <- matrix(nrow = nGenes, ncol = nGenes)
+    diag(sig) <- 1 # common variance of 1
+    sig[upper.tri(sig)] <- correlations
+    sig[lower.tri(sig)] <- t(sig)[lower.tri(sig)]
+
+    # using Matrix package
+    sigNear <- nearPD(sig)
+    cov2cor(sigNear$mat)
+}
 
 
 # make a matrix for genes being correlated
@@ -61,6 +79,7 @@ generateRandomBlock.posDefCov <- function(nGenes = 4)
     #return(list(sample = rmvnorm(1, mean = rep(0, nGenes), sigma = covMat$Sigma, method = "svd"), sigma = sig))
     return(list(sample = mvrnorm(1, mu = rep(0, nGenes), Sigma = covMat$Sigma), sigma = covMat$Sigma))
 }
+
 ranBlock <- generateRandomBlock.posDefCov(20 * 10)
 ranBlockMat <- matrix(ranBlock$sample[sample(1:length(ranBlock$sample))], nrow = 20, ncol = 10)
 
@@ -69,15 +88,46 @@ generateRandomBlock.progressive2 <- function(nrow = 5, ncol = 4, nbase = 15)
 {
     baseSamp <- rnorm(nbase, mean = 0, sd = 1)
 
-
-
-
-
 }
 
+genRandomBlock.mvn <- function(nrow = 30, ncol = 20)
+{
+    covMat <- genRanPosDefMat(nrow)
+    ranSamples <- mvrnorm(ncol, mu = rep(0, nrow), Sigma = covMat)
+    t(ranSamples)
+}
+
+debug(genRandomBlock.mvn)
+undebug(genRandomBlock.mvn)
+
+mvnBlock <- genRandomBlock.mvn(25, 20)
+mvnSim <- generateNormal(nrow = 220, ncol = 40, clusterOptions = 
+                         list(list(x.start = 1, x.end = 25, y.start = 1, y.end = 20, 
+                                   data = mvnBlock)))
+ps.mvnSim <- permuteSim(mvnSim)
+bc.oneMvn.200.20 <- bcMultipleClusters(ps.mvnSim$permutedMat, 20, 1, 200)
+bc.oneMvn.200.20.reorder <- reorderBCSol(bc.oneMvn.200.20, ps.mvnSim)
+
+truth.oneAdd <- list(list(rowIdx = 1:25, colIdx = 1:20))
+amrs.hp(truth.oneAdd, bc.oneMvn.200.20.reorder$clusters)
+
+save(bc.oneMvn.200.20.reorder, mvnSim, file = "oneMvn.RData")
+
+load("oneMvn.RData")
+plotParSolution(bc.oneMvn.200.20.reorder$allBcSol[[1]])
+A <- sapply(bc.oneMvn.200.20.reorder$allBcSol[[1]], function(x) x$ab)
+D <- sapply(bc.oneMvn.200.20.reorder$allBcSol[[1]], function(x) x$d)
+levelplot(abs(A), xlab = "Gene", ylab = "Condition", main = "Heatmap of AB")
+levelplot(D, xlab = "Gene", ylab = "Condition", main = "Heatmap of D")
 
 
-covMat <- genPositiveDefMat(10, covMethod = "unifcorrmat", rangeVar = c(1,1))
+amrs.hp(truth.oneAdd, bc.oneMvn.200.15.reorder$clusters)
+
+
+
+covMat <- genPositiveDefMat(10, covMethod = "eigen", lambdaLow = 10)
+cov2cor(covMat$Sigma)
+
 ranNorm <- mvrnorm(50, mu = rep(0, 10), Sigma = covMat$Sigma)
 cor(ranNorm)
 
@@ -123,6 +173,56 @@ generateRandomBlock.sum <- function(nGenes = 4, nCoefficients = 5)
 sumTest <- generateRandomBlock.sum(25 * 10, 5)
 sumTestMat <- matrix(sumTest$sample, nrow = 25, ncol = 10)
 cor(sumTestMat)
+
+
+genBlock.iid.N <- function(nrow, ncol, mean, sd)
+{
+    matrix(rnorm(nrow * ncol, mean = mean, sd = sd), nrow = nrow, ncol = ncol)
+}
+
+genBlock.iid.N(10, 10, 4, 4)
+
+iidN.block <- generateNormal(nrow = 2000, ncol = 40, clusterOptions = 
+               list(list(x.start = 1, x.end = 40, y.start = 1, y.end = 15, 
+                         data = genBlock.iid.N(40, 15, 4, 2))))
+
+ps.iidN.block <- permuteSim(iidN.block)
+time2000 <- system.time(bc.iidN <- bcMultipleClusters(ps.iidN.block$permutedMat, 15, 1, 50))
+bc.iidN.reorder <- reorderBCSol(bc.iidN, ps.iidN.block)
+
+save(bc.iidN.reorder, file = "bc.iidN.reorder.RData")
+
+truth.iidN <- list(list(rowIdx = 1:25, colIdx = 1:15))
+amrs.hp(truth.iidN, bc.iidN.reorder$clusters)
+
+load("bc.iidN.reorder.RData")
+A <- abs(sapply(bc.iidN.reorder$allBcSol[[1]], function (x) x$ab))
+hc.A <- hclust(dist(abs(A)))
+plot(hc.A)
+
+plotParSolution(bc.iidN.reorder$allBcSol[[1]])
+
+
+iidN.2block <- generateNormal(nrow = 220, ncol = 40, clusterOptions = 
+               list(list(x.start = 1, x.end = 25, y.start = 1, y.end = 15, 
+                         data = genBlock.iid.N(25, 15, 4, 1)),
+                    list(x.start = 101, x.end = 125, y.start = 26, y.end = 40, 
+                         data = genBlock.iid.N(25, 15, -4, 1))))
+ps.iidN.2block <- permuteSim(iidN.2block)
+bc.iidN.2block <- bcMultipleClusters(ps.iidN.2block$permutedMat, 15, 1, 50)
+bc.iidN.2block.reorder <- reorderBCSol(bc.iidN.2block, ps.iidN.2block)
+save(bc.iidN.2block.reorder, file = "bc.iidN.2block.reorder.RData")
+
+load("bc.iidN.2block.reorder.RData")
+plotParSolution(bc.iidN.2block.reorder$allBcSol[[1]])
+
+
+
+amrs.hp(truth.oneAdd, bc.iidN.reorder$clusters)
+
+levelplot(iidN.block)
+
+
 
 # this is a basic additive model
 generateRandomBlock.clust <- function(nrow = 4, ncol = 5, nCoefficients = 5, 
@@ -196,6 +296,7 @@ bc.oneProg.200 <- biclusteringPar(geneMatSim, 200, 20)
 save(progRowsSamp, geneMatSim, bc.oneProg.200, file = "bc.oneProg.200.RData")
 
 plotParSolution(bc.oneProg.200)
+
 
 
 
@@ -343,16 +444,17 @@ save(block1, block2, geneMatSim, bcSimSolPar.twoSmall.DblLam.200, file = "bcSimS
 plotParSolution <- function(parSol)
 {
     par(ask = FALSE)
-    A <- sapply(parSol, function (x) x$ab)
+    A <- abs(sapply(parSol, function (x) x$ab))
     D <- sapply(parSol, function (x) x$d)
-    print(levelplot(A, xlab = "Gene", ylab = "Iteration"))
+    print(levelplot(A, xlab = "Gene", ylab = "Iteration",
+                    col.regions = heat.colors))
     readline("Next [Enter]\t")
-    print(levelplot(D, xlab = "Condition", ylab = "Iteration"))
-    readline("Next [Enter]\t")
+    print(levelplot(D, xlab = "Condition", ylab = "Iteration",
+                    col.regions = heat.colors))
+    # readline("Next [Enter]\t")
+    # heatmap(A, Colv = NA)
+    # readline("Next [Enter]\t")
     # heatmap(D, Colv = NA)
-    heatmap(A)
-    readline("Next [Enter]\t")
-    heatmap(D)
     return(NULL)
 }
 
@@ -449,7 +551,7 @@ permuteSim <- function(simDf)
     colOrder <- sample(ncol(simDf))
 
     return(list(rowOrder = rowOrder, colOrder = colOrder, permutedMat
-                = simDf[rowOrder, colOrder]))
+                = simDf[rowOrder, colOrder], mat = simDf))
 }
 
 # test using permuted sim
@@ -458,18 +560,62 @@ geneMatSim <- generateNormal(nrow = 220, ncol = 40, clusterOptions =
                              list(list(x.start = 1, x.end = 25, y.start = 1, y.end = 15,
                                        data = addBlock$sample)))
 ps.geneMatSim <- permuteSim(geneMatSim)
-bc.oneAdd.200.15 <- biclusteringPar(ps.geneMatSim$permutedMat, 200, 15)
+bc.oneAdd.200.15 <- bcMultipleClusters(ps.geneMatSim$permutedMat, 15, 1, 200)
+
+truth.oneAdd <- list(list(rowIdx = 1:25, colIdx = 1:15))
 
 bc.oneAdd.200.15.reorder <- reorderBCSol(bc.oneAdd.200.15, ps.geneMatSim)
+
+amrs(truth.oneAdd, bc.oneAdd.200.15.reorder$clusters)
+amrs.hp(truth.oneAdd, bc.oneAdd.200.15.reorder$clusters)
 save(bc.oneAdd.200.15, bc.oneAdd.200.15.reorder, ps.geneMatSim, geneMatSim, 
      file = "permuteSimTest.RData")
 
 load("permuteSimTest.RData")
 
-plotParSolution(bc.oneAdd.200.15)
-plotParSolution(bc.oneAdd.200.15.reorder)
-A <- sapply(bc.oneAdd.200.15.reorder, function(x) x$ab)
+plotParSolution(bc.oneAdd.200.15$allBcSol[[1]])
+plotParSolution(bc.oneAdd.200.15.reorder$allBcSol[[1]])
+A <- abs(sapply(bc.oneAdd.200.15.reorder$allBcSol[[1]], function(x) x$ab))
 cutree(hclust(dist(abs(A))), 2)
+
+cutHCluster(A)
+
+
+# check performance of hierarchical clustering on additive model
+hcTestAdd <- lapply(1:50, function(it)
+                    {
+                        addBlock <- generateRandomBlock.clust(25, 15)
+                        geneMatSim <- generateNormal(nrow = 220, ncol = 40, clusterOptions = 
+                                                     list(list(x.start = 1, x.end = 25, y.start = 1, y.end = 15,
+                                                               data = addBlock$sample)))
+                        ps.geneMatSim <- permuteSim(geneMatSim)
+                        bc <- bcMultipleClusters(ps.geneMatSim$permutedMat, 15, 1, 100)
+
+                        bc.reorder <- reorderBCSol(bc, ps.geneMatSim)
+                        return(bc.reorder)
+                    })
+
+sapply(hcTestAdd, function(it) amrs(truth.oneAdd, it$clusters))
+mean(sapply(hcTestAdd, function(it) amrs.hp(truth.oneAdd, it$clusters)))
+
+# check the performance of kmeans clustering on additive model
+
+# check performance of hierarchical clustering on additive model
+kTestAdd <- lapply(1:50, function(it)
+                    {
+                        addBlock <- generateRandomBlock.clust(25, 15)
+                        geneMatSim <- generateNormal(nrow = 220, ncol = 40, clusterOptions = 
+                                                     list(list(x.start = 1, x.end = 25, y.start = 1, y.end = 15,
+                                                               data = addBlock$sample)))
+                        ps.geneMatSim <- permuteSim(geneMatSim)
+                        bc <- bcMultipleClusters.kmeans(ps.geneMatSim$permutedMat, 15, 1, 100)
+
+                        bc.reorder <- reorderBCSol(bc, ps.geneMatSim)
+                        return(bc.reorder)
+                    })
+
+mean(sapply(kTestAdd, function(it) amrs(truth.oneAdd, it$clusters)))
+mean(sapply(kTestAdd, function(it) amrs.hp(truth.oneAdd, it$clusters)))
 
 reorderBCSol <- function(bcSol, ps)
 {
@@ -543,8 +689,8 @@ amrs <- function(truthList, predList)
            {
                max(sapply(predList, function(prediction)
                       {
-                          numerator <- length(intersect(truth$G, prediction$G)) 
-                          denominator <- length(union(truth$G, prediction$G))
+                          numerator <- length(intersect(truth$rowIdx, prediction$rowIdx)) 
+                          denominator <- length(union(truth$rowIdx, prediction$rowIdx))
                           numerator / denominator
                       }))
            }))
@@ -556,7 +702,7 @@ amrs.hp <- function(truthList, predList)
 {
     expandCells <- function(aList)
     {
-        aCat <- expand.grid(aList$G, aList$C)
+        aCat <- expand.grid(aList$rowIdx, aList$colIdx)
         paste(aCat[,1], aCat[,2], sep = ".")
     }
     mean(sapply(truthList, function(truth)
@@ -581,19 +727,19 @@ amrs.hp2 <- function(truthList, predList)
                max(sapply(predList, function(prediction)
                       {
                           #predCat <- expandCells(prediction)
-                          numerator <- length(intersect(truth$G, prediction$G))  
-                          numerator <- numerator + length(intersect(truth$C, prediction$C))
-                          denominator <- length(union(truth$G, prediction$G))
-                          denominator <- denominator + length(union(truth$C, prediction$C))
+                          numerator <- length(intersect(truth$rowIdx, prediction$rowIdx))  
+                          numerator <- numerator + length(intersect(truth$colIdx, prediction$colIdx))
+                          denominator <- length(union(truth$rowIdx, prediction$rowIdx))
+                          denominator <- denominator + length(union(truth$colIdx, prediction$colIdx))
                           numerator / denominator
                       }))
            }))
 }
 
-t.amrs.truth <- list(list(G = 1:10, C = 2:4),
-                     list(G = 5:20, C = 3:10))
-t.amrs.pred <- list(list(G = 1:9, C = 2:4),
-                    list(G = c(5, 7, 14:18), C = 3:9))
+t.amrs.truth <- list(list(rowIdx = 1:10, colIdx = 2:4),
+                     list(rowIdx = 5:20, colIdx = 3:10))
+t.amrs.pred <- list(list(rowIdx = 1:9, colIdx = 2:4),
+                    list(rowIdx = c(5, 7, 14:18), colIdx = 3:9))
 
 amrs(t.amrs.truth, t.amrs.pred)
 amrs(t.amrs.truth, t.amrs.truth)
@@ -607,4 +753,6 @@ amrs.hp(t.amrs.pred, t.amrs.truth)
 amrs.hp2(t.amrs.truth, t.amrs.pred)
 amrs.hp2(t.amrs.truth, t.amrs.truth)
 amrs.hp2(t.amrs.pred, t.amrs.truth)
+
+
 
