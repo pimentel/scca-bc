@@ -196,6 +196,7 @@ truth.iidN <- list(list(rowIdx = 1:25, colIdx = 1:15))
 amrs.hp(truth.iidN, bc.iidN.reorder$clusters)
 
 load("bc.iidN.reorder.RData")
+plotParSolution(bc.iidN.reorder$allBcSol[[1]])
 A <- abs(sapply(bc.iidN.reorder$allBcSol[[1]], function (x) x$ab))
 hc.A <- hclust(dist(abs(A)))
 plot(hc.A)
@@ -755,4 +756,29 @@ amrs.hp2(t.amrs.truth, t.amrs.truth)
 amrs.hp2(t.amrs.pred, t.amrs.truth)
 
 
+
+# testing sub sampling
+iidN.block <- generateNormal(nrow = 300, ncol = 40, clusterOptions = 
+               list(list(x.start = 1, x.end = 40, y.start = 1, y.end = 15, 
+                         data = genBlock.iid.N(40, 15, 4, 2))))
+
+levelplot(iidN.block[sort(sample(nrow(iidN.block), round(nrow(iidN.block)*0.6) )),])
+iid.subSample <- bcSubSamplePar(iidN.block, 100, 15, 0.6)
+save(iid.subSample, file = "iid.subSample.6.RData")
+
+load("iid.subSample.6.RData")
+plotParSolution(iid.subSample)
+
+
+
+iidN.block <- generateNormal(nrow = 180, ncol = 40, clusterOptions = 
+               list(list(x.start = 1, x.end = 24, y.start = 1, y.end = 15, 
+                         data = genBlock.iid.N(24, 15, 4, 2))))
+
+iid.fullSample <- biclusteringPar(iidN.block, 100, 15)
+save(iid.fullSample, file = "iid.fullSample.RData")
+load("iid.fullSample.RData")
+plotParSolution(iid.fullSample)
+
+iid.subSample <- bcSubSamplePar(iidN.block, 15, 2, 0.6)
 

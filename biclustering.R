@@ -90,7 +90,8 @@ biClustMax.optim <- function(xDf, yDf, d.start, a, b, lam, verbose = TRUE)
         sum(d^2 * qVec)
     }
     optimRes <- constrOptim(d.start, objectiveFn, grad = NULL,
-                            control = list(maxit = 10000),
+                            control = list(maxit = as.integer(1000000000)),
+                            # control = list(maxit = 10000),
                             ui = constrMat, ci = constrLimit,
                             qVec = q
                             )
@@ -99,7 +100,7 @@ biClustMax.optim <- function(xDf, yDf, d.start, a, b, lam, verbose = TRUE)
     {
         warning("Error with convergence.\n", "\tError code: ", 
                 optimRes$convergence, "\tMessage: ", optimRes$message,
-                immediate = TRUE)
+                immediate. = TRUE)
     }
 
     return(list(a = a, b = b, d = optimRes$par, q))
@@ -193,6 +194,29 @@ biclusteringPar <- function(geneDf, nSamples = 100, lam)
              cat("Biclustering iteration: ", it, "\n")
              curSol <- maximizeOneSplit(geneDf, lam)
              return(curSol)
+            })
+}
+
+
+bcSubSamplePar <- function(geneDf, nSamples = 100, lam, propSample = 0.6 )
+{
+    if (propSample > 1 | propSample < 0.01)
+        stop("Invalid range for propSample")
+
+    nRowsSample <- round(propSample * nrow(geneDf) )
+    if (nRowsSample %% 2)
+        nRowsSample <- nRowsSample + 1
+
+    cat("Sampling ", nRowsSample, " features\n")
+    mclapply(1:nSamples, function(it) {
+             cat("**Biclustering iteration: ", it, "\n")
+             sampIdx <- sample.int(nrow(geneDf), size = nRowsSample)
+             # sampIdx <- sort(sampIdx)
+             abSol <- rep.int(0, nrow(geneDf))
+             curSol <- maximizeOneSplit(geneDf[sampIdx,], lam)
+             abSol[sampIdx] <- curSol$ab
+             d <- curSol$d
+             return(list(ab = abSol, d = d))
             })
 }
 
