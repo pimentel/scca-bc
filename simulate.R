@@ -51,8 +51,8 @@ generateRandomBlock <- function(nGenes = 4)
     return(list(sample = rmvnorm(1, mean = rep(0, nGenes), sigma = sig, method = "svd"), sigma = sig))
 }
 
-debug(generateRandomBlock)
-generateRandomBlock(40)
+# debug(generateRandomBlock)
+# generateRandomBlock(40)
 
 genRanPosDefMat <- function(nGenes = 10, min = 0.5, max = 0.8)
 {
@@ -66,8 +66,11 @@ genRanPosDefMat <- function(nGenes = 10, min = 0.5, max = 0.8)
 
     # using Matrix package
     sigNear <- nearPD(sig)
-    cov2cor(sigNear$mat)
+    cov2cor(as.matrix(sigNear$mat))
 }
+
+mat <- genRanPosDefMat(30)
+mat2 <- cor2cov(mat)
 
 
 # make a matrix for genes being correlated
@@ -90,9 +93,9 @@ generateRandomBlock.progressive2 <- function(nrow = 5, ncol = 4, nbase = 15)
 
 }
 
-genRandomBlock.mvn <- function(nrow = 30, ncol = 20)
+genRandomBlock.mvn <- function(nrow = 30, ncol = 20, min = 0.5, max = 0.8)
 {
-    covMat <- genRanPosDefMat(nrow)
+    covMat <- genRanPosDefMat(nrow, min, max)
     ranSamples <- mvrnorm(ncol, mu = rep(0, nrow), Sigma = covMat)
     t(ranSamples)
 }
@@ -100,7 +103,7 @@ genRandomBlock.mvn <- function(nrow = 30, ncol = 20)
 debug(genRandomBlock.mvn)
 undebug(genRandomBlock.mvn)
 
-mvnBlock <- genRandomBlock.mvn(25, 20)
+mvnBlock <- genRandomBlock.mvn(300, 50)
 mvnSim <- generateNormal(nrow = 220, ncol = 40, clusterOptions = 
                          list(list(x.start = 1, x.end = 25, y.start = 1, y.end = 20, 
                                    data = mvnBlock)))
@@ -182,6 +185,8 @@ genBlock.iid.N <- function(nrow, ncol, mean, sd)
 
 genBlock.iid.N(10, 10, 4, 4)
 
+mean(genBlock.iid.N(25, 15, 0, 1))
+
 iidN.block <- generateNormal(nrow = 2000, ncol = 40, clusterOptions = 
                list(list(x.start = 1, x.end = 40, y.start = 1, y.end = 15, 
                          data = genBlock.iid.N(40, 15, 4, 2))))
@@ -249,6 +254,13 @@ generateRandomBlock.progressive <- function(nrow = 4, ncol = 5, nbase = 3)
 }
 genes <- generateRandomBlock.progressive(nrow = 20, ncol = 10)
 
+genAdditive <- function(nrow = 4, ncol = 5)
+{
+    rowBase <- sample(0:5, nrow, replace = TRUE)
+    colBase <- sample(0:5, ncol, replace = TRUE)
+    df <- matrix(rep(colBase, nrow), byrow = TRUE, nrow = nrow)
+    df + rowBase + rnorm(nrow * ncol)
+}
 
 # Progressive on genes (rows)
 generateRandomBlock.progRows <- function(nrow = 4, ncol = 5, nbase = 3)
@@ -259,7 +271,7 @@ generateRandomBlock.progRows <- function(nrow = 4, ncol = 5, nbase = 3)
                baseCumSum <- cumsum(baseNum)
                return(baseCumSum[(nbase+1):(nbase+ncol)])
            })
-    return(list(sample = t(ranMatrix)))
+    return(t(ranMatrix))
 }
 
 
@@ -442,16 +454,46 @@ bcSimSolPar.twoSmall.DblLam.200 <- biclusteringPar(geneMatSim, 200)
 save(block1, block2, geneMatSim, bcSimSolPar.twoSmall.DblLam.200, file = "bcSimSolPar.twoSmall.DblLam.200.RData")
 
 
-plotParSolution <- function(parSol)
+plotParSolution <- function(parSol, fBase = NA, rowNames = NA,
+                            colNames = NA)
 {
     par(ask = FALSE)
     A <- abs(sapply(parSol, function (x) x$ab))
     D <- sapply(parSol, function (x) x$d)
-    print(levelplot(A, xlab = "Gene", ylab = "Iteration",
-                    col.regions = heat.colors))
+    dRot <- 0
+    fSize <- 1.5
+    if (!is.na(rowNames)[1])
+    {
+        rownames(A) <- rowNames
+    }
+    if (!is.na(colNames)[1])
+    {
+        rownames(D) <- colNames
+        dRot <- 45
+        fSize = 1
+    }
+    # print(levelplot(t(A), xlab = "Gene", ylab = "Iteration",
+    print(levelplot(t(A), 
+                    xlab = list(label = "Iteration", cex = 1.5), 
+                    ylab = list(label = "Feature", cex = 1.5),
+                    col.regions = heat.colors, colorkey = list(labels = list(cex=1.5)),
+                    scales = list(cex = 1.5),
+                    panel = function(...) {
+                        panel.fill(col = "black")
+                        panel.levelplot(...)
+                    } ) )
     readline("Next [Enter]\t")
-    print(levelplot(D, xlab = "Condition", ylab = "Iteration",
-                    col.regions = heat.colors))
+    if (!is.na(fBase))
+        dev.print(pdf, paste("../img/", fBase, "Feature.pdf", sep = ""))
+    print(levelplot(D, 
+                    xlab = list(label = "Condition", cex = 1.5), 
+                    ylab = list(label = "Iteration", cex = 1.5),
+                    col.regions = heat.colors, colorkey = list(labels = list(cex = 1.5)),
+                    scales = list(cex = 1.5, x = list(cex = fSize, rot = dRot))
+                    ))
+    readline("Next [Enter]\t")
+    if (!is.na(fBase))
+        dev.print(pdf, paste("../img/", fBase, "Cond.pdf", sep = ""))
     # readline("Next [Enter]\t")
     # heatmap(A, Colv = NA)
     # readline("Next [Enter]\t")
@@ -720,6 +762,28 @@ amrs.hp <- function(truthList, predList)
 }
 
 
+# check how well you do on every cell
+amrs.eachClust <- function(truthList, predList)
+{
+    expandCells <- function(aList)
+    {
+        aCat <- expand.grid(aList$rowIdx, aList$colIdx)
+        paste(aCat[,1], aCat[,2], sep = ".")
+    }
+    (sapply(truthList, function(truth)
+           {
+               truthCat <- expandCells(truth)
+               max(sapply(predList, function(prediction)
+                      {
+                          predCat <- expandCells(prediction)
+                          numerator <- length(intersect(truthCat, predCat)) 
+                          denominator <- length(union(truthCat, predCat))
+                          numerator / denominator
+                      }))
+           }))
+}
+
+
 # check how well you do on genes then on conditions
 amrs.hp2 <- function(truthList, predList)
 {
@@ -769,6 +833,27 @@ save(iid.subSample, file = "iid.subSample.6.RData")
 load("iid.subSample.6.RData")
 plotParSolution(iid.subSample)
 
+debug(postSubSample)
+post.iid.subSample <- postSubSample(iid.subSample, 0.95)
+post.iid.subSample <- postSubSample.percent(iid.subSample, 0.95, 0.7)
+apply(post.iid.subSample$ab, 2, mean)
+plot(post.iid.subSample$ab)
+levelplot(post.iid.subSample$ab)
+levelplot(post.iid.subSample$d)
+
+kClust <- kmeans(post.iid.subSample$ab, 3)
+
+cutree(hclust(dist(post.iid.subSample$ab)), 3)
+
+hPclust <- cutree(hclust(dist(post.iid.subSample$ab)), 3)
+hPclust
+
+truth.iid <- list(list(rowIdx = 1:40, colIdx = 1:15))
+amrs.hp(truth.iid, post.kmeans(post.iid.subSample))
+amrs.hp(truth.iid, post.hclust(post.iid.subSample))
+
+post.kmeans(post.iid.subSample)
+
 
 
 iidN.block <- generateNormal(nrow = 180, ncol = 40, clusterOptions = 
@@ -782,3 +867,66 @@ plotParSolution(iid.fullSample)
 
 iid.subSample <- bcSubSamplePar(iidN.block, 15, 2, 0.6)
 
+
+ggPlotParSolution <- function(parSol, fBase = NA, rowNames = NA,
+                              colNames = NA)
+{
+    par(ask = FALSE)
+    A <- abs(sapply(parSol, function (x) x$ab))
+    D <- sapply(parSol, function (x) x$d)
+    dRot <- 0
+    dxSize <- 14
+    fSize <- 1.5
+    if (!is.na(rowNames)[1])
+    {
+        rownames(A) <- rowNames
+    }
+    if (!is.na(colNames)[1])
+    {
+        rownames(D) <- colNames
+        dRot <- 90
+        dxSize <- 10
+        fSize = 1
+    }
+    meltA <- melt(t(A))
+    colnames(meltA) <- c("x", "y", "value")
+    breaksA <- round(seq(0, max(meltA$value, na.rm = T), length.out = 10), 3)
+    p <- ggplot(meltA, aes(x, y, fill = value))
+    p <- p + geom_tile() + scale_fill_gradient(low = "firebrick2", high = "yellow", 
+                                               guide = guide_legend(title = "Coefficient", reverse = T), 
+                                               breaks = breaksA) 
+
+    p <- p + xlab("Iteration") + ylab("Feature") + theme_bw() + theme(axis.text.x=element_text(size=14),
+                                                                      axis.text.y=element_text(size=14), 
+                                                                      axis.title=element_text(size=15),
+                                                                      legend.text=element_text(size=14),
+                                                                      legend.title=element_text(size=14))
+    print(p)
+    readline("Next [Enter]\t")
+    if (!is.na(fBase))
+        ggsave(paste("../img/gg", fBase, "Feature.pdf", sep = ""), 
+               width = 6.62, height = 12.8)
+    meltD <- melt(D)
+    colnames(meltD) <- c("x", "y", "value")
+    breaksD <- round(seq(0, max(meltD$value, na.rm = T), length.out = 10), 1)
+    p <- ggplot(meltD, aes(x, y, fill = value))
+    p <- p + geom_tile() + scale_fill_gradient(low = "firebrick2", high = "yellow", 
+                                               guide = guide_legend(title = "Coefficient", reverse = T), 
+                                               breaks = breaksD) 
+    p <- p + xlab("Condition") + ylab("Iteration") + theme_bw() + theme(axis.text.x=element_text(size=dxSize,
+                                                                                                 angle = dRot),
+                                                    axis.text.y=element_text(size=14), 
+                                                    axis.title =element_text(size=15),
+                                                    legend.text=element_text(size=14),
+                                                    legend.title=element_text(size=14))
+    print(p)
+    readline("Next [Enter]\t")
+    if (!is.na(fBase))
+        ggsave(paste("../img/gg", fBase, "Cond.pdf", sep = ""),
+               width = 6.62, height = 12.8)
+
+    # Saving 6.62 x 12.8 in image
+    return(NULL)
+}
+
+ggPlotParSolution(nearMedMvn, )

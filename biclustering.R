@@ -3,6 +3,8 @@
 
 # Lee et. al. package. Provides 'scca()'
 library(scca)
+library(MASS)
+library(Matrix)
 library(multicore)
 
 debug(biClustMax.optim)
@@ -42,7 +44,7 @@ splitEvenly <- function(n)
 ##' @param lam maximum cluster size
 ##' @return A list containing maximum values of a, b, d
 # uses constrOptim
-biClustMax.optim <- function(xDf, yDf, d.start, a, b, lam, verbose = TRUE)
+biClustMax.optim <- function(xDf, yDf, d.start, a, b, lam, verbose = TRUE, optim.max = 4, lam.lwr = 4)
 {
 
     # iterate until we've hit maximum iterations or QP has converged
@@ -81,26 +83,47 @@ biClustMax.optim <- function(xDf, yDf, d.start, a, b, lam, verbose = TRUE)
     constrMat <- rbind(constrMat, -diag(length(q)))
     # regularize (sum(d) <= lam)
     constrMat <- rbind(constrMat, rep.int(-1, length(q)))
+    # regularize (sum(d) >= lam.lwr)
+    constrMat <- rbind(constrMat, rep.int(1, length(q)))
     constrLimit <- c(rep(0, length(q)), 
                      rep(-1, length(q)),
-                     -lam)
+                     -lam, lam.lwr)
     objectiveFn <- function(d, qVec)
     {
         # sum(0.5 * d^2 * qVec)
         sum(d^2 * qVec)
     }
-    optimRes <- constrOptim(d.start, objectiveFn, grad = NULL,
-                            control = list(maxit = as.integer(1000000000)),
-                            # control = list(maxit = 10000),
-                            ui = constrMat, ci = constrLimit,
-                            qVec = q
-                            )
 
-    if (optimRes$convergence != 0)
-    {
-        warning("Error with convergence.\n", "\tError code: ", 
-                optimRes$convergence, "\tMessage: ", optimRes$message,
-                immediate. = TRUE)
+    optimIt <- 0
+    repeat {
+        optimRes <- constrOptim(d.start, objectiveFn, grad = NULL,
+                                control = list(maxit = as.integer(1000000000)),
+                                # control = list(maxit = 10000),
+                                ui = constrMat, ci = constrLimit,
+                                qVec = q
+                                )
+
+        if (optimRes$convergence != 0)
+        {
+            warning("Error with convergence.\n", "\tError code: ", 
+                    optimRes$convergence, "\tMessage: ", optimRes$message,
+                    immediate. = TRUE)
+            if (optimIt >= optim.max)
+            {
+                warning("*****Reached maximum number of iterations of constrOptim. Exiting",
+                        immediate. = TRUE)
+                break
+            }
+            optimIt <- optimIt + 1
+            d.start <- optimRes$par
+            cat("\t\tRestarting optimization at new point.\n")
+            cat("\t\tconstrOptim iteration: ", optimIt + 1, "\n")
+        }
+        else
+        {
+            break
+        }
+
     }
 
     return(list(a = a, b = b, d = optimRes$par, q))
@@ -208,17 +231,168 @@ bcSubSamplePar <- function(geneDf, nSamples = 100, lam, propSample = 0.6 )
         nRowsSample <- nRowsSample + 1
 
     cat("Sampling ", nRowsSample, " features\n")
-    mclapply(1:nSamples, function(it) {
+    lapply(1:nSamples, function(it) {
              cat("**Biclustering iteration: ", it, "\n")
              sampIdx <- sample.int(nrow(geneDf), size = nRowsSample)
              # sampIdx <- sort(sampIdx)
-             abSol <- rep.int(0, nrow(geneDf))
+             abSol <- rep.int(NA, nrow(geneDf))
              curSol <- maximizeOneSplit(geneDf[sampIdx,], lam)
              abSol[sampIdx] <- curSol$ab
              d <- curSol$d
              return(list(ab = abSol, d = d))
             })
 }
+
+postSubSample <- function(subSampleSol, percentile = 0.75)
+{
+    ab <- t(sapply(subSampleSol, function (x) abs(x$ab)))
+    d <- t(sapply(subSampleSol, function (x) x$d))
+
+    abGt <- apply(ab, 2, function(col) {
+                  # median(col, na.rm = TRUE)
+                  mean(col, na.rm = TRUE)
+                  # quantile(col, probs = percentile, na.rm = TRUE)
+            })
+    dGt <- apply(d, 2, function(col) 
+                  {
+                      median(col, na.rm = TRUE)
+                  })
+    # dGt <- t(dGt)
+    return(list(ab = abGt, d = dGt))
+}
+
+
+postSubSample.percent <- function(subSampleSol, percentile = 0.95, eps = 0.05)
+{
+    ab <- t(sapply(subSampleSol, function (x) abs(x$ab)))
+    d <- sapply(subSampleSol, function (x) x$d)
+    # want to implement in top 5%, 90% it is chosen
+    abGt <- apply(ab, 1, function(row) {
+                  # median(col, na.rm = TRUE)
+                  row >= quantile(row, probs = percentile, na.rm = TRUE)
+            })
+    rowIdx <- which(apply(abGt, 1, mean, na.rm = T) >= eps)
+    # dGt <- apply(d, 1, function(row) 
+    #               {
+    #                   row >= quantile(row, probs = percentile, na.rm = TRUE)
+    #               })
+    # dGt <- t(dGt)
+    # colIdx <- which(apply(d, 1, mean, na.rm = T) >= eps)
+
+    
+    cutHCluster <- function(mat)
+    {
+        hc <- hclust(dist(mat))
+        hcCuts <- cutree(hc, 2)
+
+        cutIdx <- 1
+        if (mean(mat[which(hcCuts == 1), ]) < 
+            mean(mat[which(hcCuts == 2), ]))
+        {
+            cutIdx <- 2
+        }
+        cutIdx <- which(hcCuts == cutIdx)
+
+        return(cutIdx)
+    }
+
+    colIdx <- cutHCluster(d)
+
+
+    return(list(rowIdx = rowIdx, colIdx = colIdx))
+}
+
+debug(postSubSample.percent)
+
+postSubSample.percent2 <- function(subSampleSol, percentile = 0.95, eps = 0.05)
+{
+    ab <- t(sapply(subSampleSol, function (x) abs(x$ab)))
+    d <- t(sapply(subSampleSol, function (x) x$d))
+    # want to implement in top 5%, 90% it is chosen
+    abGt <- apply(ab, 1, function(row) {
+                  # median(col, na.rm = TRUE)
+                  row >= quantile(row, probs = percentile, na.rm = TRUE)
+            })
+    rowIdx <- which(apply(abGt, 1, mean, na.rm = T) >= eps)
+
+    
+    dGt <- apply(d, 1, function(row) {
+                 row >= quantile(row, probs = percentile, na.rm = T)
+            })
+    colIdx <- which(apply(dGt, 1, mean, na.rm = T) >= eps)
+
+    return(list(rowIdx = rowIdx, colIdx = colIdx))
+}
+
+
+post.hclust <- function(postSample, nAB = 3, nD = 2)
+{
+    clustAB <- cutree(hclust(dist(postSample$ab)), nAB)
+    clustABCenter <- sapply(unique(clustAB), 
+                            function(it) median(postSample$ab[which(clustAB == it)]))
+    clustABMax <- which.max(clustABCenter)
+    rowIdx <- which(clustAB == clustABMax)
+
+    clustD <- cutree(hclust(dist(postSample$d)), nD)
+    clustDCenter <- sapply(unique(clustD), 
+                           function(it) median(postSample$d[which(clustD == it)]))
+    clustDMax <- which.max(clustDCenter)
+    colIdx <- which(clustD == clustDMax)
+    list(list(rowIdx = rowIdx, colIdx = colIdx))
+}
+
+post.kmeans <- function(postSample, nAB = 3, nD = 2)
+{
+    kClustAB <- kmeans(postSample$ab, nAB)
+    kClustABMax <- which.max(kClustAB$centers)
+    rowIdx <- which(kClustAB$cluster == kClustABMax)
+
+    clustD <- kmeans(postSubSample$d, nD)
+    clustDMax <- which.max(clustD$center)
+    colIdx <- which(clustD$cluster == clustDMax)
+
+    list(list(rowIdx = rowIdx, colIdx = colIdx))
+}
+
+
+bcMultipleClusters.subSample <- function(geneDf, lam, nClusters, nSamples = 100, 
+                                         propSample = 0.6)
+{
+    allBcSol <- list()
+    clusters <- list()
+    for (clust in 1:nClusters)
+    {
+        bcSol <- bcSubSamplePar(geneDf, nSamples, lam, propSample)
+        allBcSol <- append(allBcSol, list(bcSol))
+
+        postSol <- postSubSample.percent(bcSol, 0.9, 0.5)
+
+        rowIdx <- postSol$rowIdx
+        colIdx <- postSol$colIdx
+
+        clusters <- append(clusters, list(list(rowIdx = rowIdx, colIdx = colIdx)))
+
+        # given a list of rows and columns, converts pairwise combinations into
+        # 1D index for matrix
+        get1DIdx <- function(rows, cols) 
+        {
+            allPairs <- expand.grid(rows, cols)
+            nrow(geneDf) * (allPairs[, 2] - 1) + allPairs[, 1]
+        }
+
+        # mask each gene with random values from the rest of the matrix also
+        # considered doing this with JUST the other values of the gene... need
+        # to experiment with that
+        clustIdx <- get1DIdx(rowIdx, colIdx)
+        geneDf[clustIdx] <- sample(geneDf[-clustIdx], length(clustIdx))
+        # temporarily sample rnorm to debug FP issue
+        # geneDf[clustIdx] <- rnorm(length(clustIdx))
+    }
+
+    return(list(allBcSol = allBcSol, clusters = clusters))
+}
+
+
 
 
 bcMultipleClusters <- function(geneDf, lam, nClusters, nSamples = 100)
@@ -285,9 +459,9 @@ bcMultipleClusters <- function(geneDf, lam, nClusters, nSamples = 100)
         # considered doing this with JUST the other values of the gene... need
         # to experiment with that
         clustIdx <- get1DIdx(rowIdx, colIdx)
-        # geneDf[clustIdx] <- sample(geneDf[-clustIdx], length(clustIdx))
+        geneDf[clustIdx] <- sample(geneDf[-clustIdx], length(clustIdx))
         # temporarily sample rnorm to debug FP issue
-        geneDf[clustIdx] <- rnorm(length(clustIdx))
+        # geneDf[clustIdx] <- rnorm(length(clustIdx))
     }
 
     return(list(allBcSol = allBcSol, clusters = clusters))
