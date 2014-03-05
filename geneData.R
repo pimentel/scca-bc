@@ -381,6 +381,7 @@ pssTmp <- postSubSample.percent(bc30.fdr30p90Z , 0.90, 0.90)
 write(rownames(datTmp[pssTmp$rowIdx, pssTmp$colIdx]), file = "../results/fdr30p90Z_90_90_FG.txt")
 
 pssTmp <- postSubSample.percent(bc30.fdr30p90Z , 0.75, 0.90)
+
 write(rownames(datTmp[pssTmp$rowIdx, pssTmp$colIdx]), file = "../results/fdr30p90Z_75_90_FG.txt")
 
 write.table(datTmp[pssTmp$rowIdx, pssTmp$colIdx], file = "../results/fdr30p90Z_75_90_reactome_raw.txt",
@@ -405,9 +406,12 @@ bc30.fdr30p90.minus1Z <- bcSubSamplePar(fdr30p90.minus1Z, 100, 30, 0.6)
 save(bc25.fdr30p90.minus1Z,
      bc30.fdr30p90.minus1Z, file = "bc2.fdr30p90.RData")
 
+# 2nd bicluster...not particularly interesting... mostly adult stages
 load("../bcSol/bc2.fdr30p90.RData")
 pssTmp <- postSubSample.percent(bc25.fdr30p90.minus1Z , 0.75, 0.75)
+pssTmp <- postSubSample.top(bc25.fdr30p90.minus1Z , 0.75, 0.75, 25)
 ggPlotExpression(datTmp[pssTmp$rowIdx, pssTmp$colIdx])
+ggsave("../resultsBen2/2nd_bicluster.pdf")
 
 pssTmp <- postSubSample.percent(bc30.fdr30p90.minus1Z , 0.75, 0.85)
 write(rownames(datTmp[pssTmp$rowIdx, pssTmp$colIdx]), file = "../results/fdr30p90Z.2_FG.txt")
@@ -435,6 +439,195 @@ write(rownames(datTmp[pssTmp$rowIdx, pssTmp$colIdx]), file = "../results/fdr30p9
 
 
 # finding smaller biclusters
-bc5.fdr30p90Z <- bcSubSamplePar(fdr30p90Z, 100, 5, 0.6)
-bc8.fdr30p90Z <- bcSubSamplePar(fdr30p90Z, 100, 8, 0.6)
-bc10.fdr30p90Z <- bcSubSamplePar(fdr30p90Z, 100, 10, 0.6)
+# UPDATE: these all look like crap...
+bc5.fdr30p90Z <- bcSubSamplePar(fdr30p90Z, 200, 5, 0.6)
+bc8.fdr30p90Z <- bcSubSamplePar(fdr30p90Z, 200, 8, 0.6, lam.lwr = 5)
+bc10.fdr30p90Z <- bcSubSamplePar(fdr30p90Z, 200, 10, 0.6, lam.lwr = 7)
+bc15.fdr30p90Z <- bcSubSamplePar(fdr30p90Z, 200, 15, 0.6, lam.lwr = 7)
+save(bc5.fdr30p90Z, 
+     bc8.fdr30p90Z,
+     bc10.fdr30p90Z, 
+     bc15.fdr30p90Z, file = "bcSmall.fdr30.RData")
+save(bc5.fdr30p90Z, file = "bc5.fdr30p90Z.RData")
+
+
+load("../bcSol/bc5.fdr30p90Z.RData")
+postSubSample.percent(bc5.fdr30p90Z, 0.9, 0.5)
+pssTmp <- postSubSample.percent2(bc5.fdr30p90Z, 0.85, 0.5, 0.75, 0.50)
+ggPlotExpression(datTmp[pssTmp$rowIdx, pssTmp$colIdx])
+
+load("../bcSol/bcSmall.fdr30.RData")
+pssTmp <- postSubSample.percent2(bc5.fdr30p90Z, 0.85, 0.6, 0.75, 0.50)
+ggPlotExpression(datTmp[pssTmp$rowIdx, pssTmp$colIdx])
+
+tmpCor <- cor(t(datTmp[pssTmp$rowIdx, pssTmp$colIdx]))
+hist(tmpCor[upper.tri(tmpCor)], xlim = c(-1, 1))
+
+pssTmp <- postSubSample.percent(bc8.fdr30p90Z, 0.85, 0.6)
+pssTmp <- postSubSample.percent2(bc8.fdr30p90Z, 0.85, 0.6, 0.75, 0.50)
+ggPlotExpression(datTmp[pssTmp$rowIdx, pssTmp$colIdx])
+
+
+pssTmp <- postSubSample.percent(bc10.fdr30p90Z, 0.85, 0.6)
+pssTmp <- postSubSample.percent2(bc10.fdr30p90Z, 0.85, 0.6, 0.75, 0.50)
+ggPlotExpression(datTmp[pssTmp$rowIdx, pssTmp$colIdx])
+
+pssTmp <- postSubSample.percent(bc15.fdr30p90Z, 0.85, 0.6)
+pssTmp <- postSubSample.percent2(bc15.fdr30p90Z, 0.85, 0.6, 0.75, 0.50)
+ggPlotExpression(datTmp[pssTmp$rowIdx, pssTmp$colIdx])
+
+# look at samples that Ben is interested in 
+benSamples <- (c("Zn_4.5mM_AdMixed_4days","Cd_0.05M_Cdcl2_AdMixed_4days","Cd_0.1M_Cdcl2_AdMixed_4days","Cu_15mM_AdMixed_4days","Cold1_AdMixed_4days","Cold2_AdMixed_4days","HeatShock1hr36C_WetHeat30min25C_AdMixed_4days","Caffeine_2.5mg_per_ml_AdMixed_4days","Caffeine_PreLethal_AdMixed_4days","Paraquat_5mM_AdMixed_4days","Paraquat_10mM_AdMixed_4days"))
+benIdx <- trimPercent(gas.mat[,benSamples], 
+                      idxAtFDR(geneDE.fdr, rownames(gas.mat), 0.3), 0.9)
+benMat <- gas.mat[benIdx, benSamples]
+benMatZ <- t(scale(t(benMat)))
+
+bc5.ben <- bcSubSamplePar(benMatZ, 200, 5, 0.6, lam.lwr = 4)
+bc7.ben <- bcSubSamplePar(benMatZ, 200, 7, 0.6, lam.lwr = 5)
+bc9.ben <- bcSubSamplePar(benMatZ, 200, 9, 0.6, lam.lwr = 5)
+bc11.ben <- bcSubSamplePar(benMatZ, 200, 11, 0.6, lam.lwr = 5)
+save(bc5.ben, 
+     bc7.ben,     
+     bc9.ben,     
+     bc11.ben,file = "bc5.ben.RData")
+
+load("../bcSol/bc5.ben.RData")
+
+# this is kind of interesting... up and down regulated genes
+datTmp <- benMatZ
+datTmp <- benMat
+pssTmp <- postSubSample.percent(bc5.ben, 0.9, 0.5)
+ggPlotExpression(datTmp[pssTmp$rowIdx, pssTmp$colIdx])
+ggsave("../resultsBen2/perturb_90_50.pdf")
+write(rownames(datTmp[pssTmp$rowIdx, pssTmp$colIdx]), file = "../resultsBen2/perturb5Z_75_90_FG.txt")
+write(rownames(datTmp), file = "../resultsBen2/perturb_BG.txt")
+write.table(datTmp[pssTmp$rowIdx, pssTmp$colIdx], file = "../resultsBen2/perturbZ_90_50_reactome_z.txt",
+            sep = "\t", col.names = F, quote = F)
+
+
+postSubSample.percent2(bc5.ben, 0.9, 0.5, 0.9, 0.5)
+postSubSample.top(bc5.ben, 0.9, 0.5, 5)
+
+pssTmp <- postSubSample.percent(bc7.ben, 0.9, 0.5)
+pssTmp <- postSubSample.percent(bc9.ben, 0.85, 0.9)
+pssTmp <- postSubSample.top(bc9.ben, 0.85, 0.9, 9)
+ggPlotExpression(datTmp[pssTmp$rowIdx, pssTmp$colIdx])
+ggPlotParSolution(bc9.ben)
+
+pssTmp <- postSubSample.percent(bc11.ben, 0.95, 0.9)
+ggPlotExpression(datTmp[pssTmp$rowIdx, pssTmp$colIdx])
+tmpCor <- cor(t(datTmp[pssTmp$rowIdx, pssTmp$colIdx]))
+hist(tmpCor[upper.tri(tmpCor)])
+
+
+# next... try to remove all the "normal" samples
+normNames <- grep("^Ad", colnames(gas.mat))
+notNorm <- setdiff(1:ncol(gas.mat), normNames)
+notNormIdx <- trimPercent(gas.mat[,notNorm], 
+                          idxAtFDR(geneDE.fdr, rownames(gas.mat), 0.3), 0.9)
+nnMat <- gas.mat[notNormIdx, notNorm]
+nnZ <- t(scale(t(nnMat)))
+
+bc5.nn <- bcSubSamplePar(nnZ, 200, 5, 0.6, lam.lwr = 4)
+bc7.nn <- bcSubSamplePar(nnZ, 200, 7, 0.6, lam.lwr = 5)
+bc9.nn <- bcSubSamplePar(nnZ, 200, 9, 0.6, lam.lwr = 5)
+bc11.nn <- bcSubSamplePar(nnZ, 200, 11, 0.6, lam.lwr = 5)
+bc15.nn <- bcSubSamplePar(nnZ, 200, 11, 0.6, lam.lwr = 7)
+save(bc5.nn, 
+     bc7.nn, 
+     bc9.nn, 
+     bc11.nn,
+     bc15.nn,file = "bc.nn.RData")
+
+load("../bcSol/bc.nn.RData")
+
+datTmp <- nnZ
+
+pssTmp <- postSubSample.percent(bc5.nn, 0.75, 0.75)
+pssTmp <- postSubSample.percent2(bc5.nn, 0.75, 0.75, 0.75, 0.50)
+ggPlotExpression(datTmp[pssTmp$rowIdx, pssTmp$colIdx])
+
+pssTmp <- postSubSample.percent(bc7.nn, 0.75, 0.75)
+pssTmp <- postSubSample.percent2(bc7.nn, 0.75, 0.75, 0.75, 0.50)
+ggPlotExpression(datTmp[pssTmp$rowIdx, pssTmp$colIdx])
+
+pssTmp <- postSubSample.percent(bc9.nn, 0.75, 0.75)
+pssTmp <- postSubSample.percent2(bc9.nn, 0.75, 0.75, 0.75, 0.50)
+ggPlotExpression(datTmp[pssTmp$rowIdx, pssTmp$colIdx])
+
+
+pssTmp <- postSubSample.percent(bc11.nn, 0.75, 0.75)
+pssTmp <- postSubSample.percent2(bc11.nn, 0.75, 0.75, 0.75, 0.50)
+ggPlotExpression(datTmp[pssTmp$rowIdx, pssTmp$colIdx])
+
+pssTmp <- postSubSample.percent(bc15.nn, 0.75, 0.75)
+pssTmp <- postSubSample.percent2(bc15.nn, 0.75, 0.75, 0.5, 0.50)
+ggPlotParSolution(bc15.nn)
+ggPlotExpression(datTmp[pssTmp$rowIdx, pssTmp$colIdx])
+
+par(mfrow = c(2, 1))
+tmpCor <- cor(t(datTmp[pssTmp$rowIdx, pssTmp$colIdx]))
+hist(tmpCor[upper.tri(tmpCor)])
+
+# remove embryo stuff too
+nAE <- grep("^Ad|^em", colnames(gas.mat))
+nAECols <- setdiff(1:ncol(gas.mat), nAE)
+nAERows <- trimPercent(gas.mat[,nAECols],
+                       idxAtFDR(geneDE.fdr, rownames(gas.mat), 0.3),
+                       0.945)
+nAEMat <- gas.mat[nAERows, nAECols]
+nAEMatZ <- t(scale(t(nAEMat)))
+
+datTmp <- nAEMatZ
+datTmp <- nAEMat
+
+bc5nAE <- bcSubSamplePar(nAEMatZ, 200, 5, 0.6, lam.lwr = 4)
+bc7nAE <- bcSubSamplePar(nAEMatZ, 200, 7, 0.6, lam.lwr = 5)
+bc9nAE <- bcSubSamplePar(nAEMatZ, 200, 9, 0.6, lam.lwr = 5)
+bc11nAE <- bcSubSamplePar(nAEMatZ, 200, 11, 0.6, lam.lwr = 5)
+bc15nAE <- bcSubSamplePar(nAEMatZ, 200, 15, 0.6, lam.lwr = 12)
+save(bc5nAE,
+     bc7nAE,
+     bc9nAE,
+     bc11nAE,
+     bc15nAE, file = "bc.nAE.RData")
+
+load("../bcSol/bc.nAE.RData")
+
+pssTmp <- postSubSample.percent(bc5nAE, 0.75, 0.75)
+pssTmp <- postSubSample.percent2(bc5nAE, 0.75, 0.75, 0.60, 0.50)
+pssTmp <- postSubSample.top(bc5nAE, 0.75, 0.75, 5)
+pssTmp
+ggPlotExpression(datTmp[pssTmp$rowIdx, pssTmp$colIdx])
+ggPlotParSolution(bc5nAE)
+
+pssTmp <- postSubSample.percent(bc7nAE, 0.75, 0.75)
+pssTmp <- postSubSample.percent2(bc7nAE, 0.75, 0.75, 0.60, 0.50)
+pssTmp
+ggPlotExpression(datTmp[pssTmp$rowIdx, pssTmp$colIdx])
+ggPlotParSolution(bc5nAE)
+
+
+pssTmp <- postSubSample.percent(bc9nAE, 0.75, 0.75)
+pssTmp <- postSubSample.percent2(bc9nAE, 0.75, 0.75, 0.60, 0.50)
+pssTmp
+ggPlotExpression(datTmp[pssTmp$rowIdx, pssTmp$colIdx])
+ggPlotParSolution(bc9nAE)
+
+
+pssTmp <- postSubSample.percent(bc11nAE, 0.75, 0.75)
+pssTmp <- postSubSample.percent2(bc11nAE, 0.75, 0.75, 0.60, 0.50)
+pssTmp
+ggPlotExpression(datTmp[pssTmp$rowIdx, pssTmp$colIdx])
+ggPlotParSolution(bc11nAE)
+
+pssTmp <- postSubSample.percent(bc15nAE, 0.75, 0.75)
+pssTmp <- postSubSample.percent2(bc15nAE, 0.80, 0.75, 0.50, 0.50)
+pssTmp <- postSubSample.sort(bc15nAE, 0.75, 0.75)
+pssTmp
+ggPlotExpression(datTmp[pssTmp$rowIdx, pssTmp$colIdx])
+ggPlotParSolution(bc15nAE)
+
+
+

@@ -868,6 +868,8 @@ plotParSolution(iid.fullSample)
 iid.subSample <- bcSubSamplePar(iidN.block, 15, 2, 0.6)
 
 
+debugonce(ggPlotParSolution)
+
 ggPlotParSolution <- function(parSol, fBase = NA, rowNames = NA,
                               colNames = NA)
 {
