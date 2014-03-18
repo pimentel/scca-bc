@@ -575,8 +575,9 @@ postSubSample.tight <- function(subSampleSol, abThresh = 0.6, dQuant = 0.5)
         getBestClust(dat, bestK)
     }
 
-    rowIdx <- with(abStats, tight(cbind(medRate, sd)))
+    # rowIdx <- with(abStats, tight(cbind(medRate, sd)))
     # rowIdx <- with(abStats, tight(cbind(medRate)))
+    # rowIdx <- with(abStats, tight(cbind(med, sd)))
     # rowIdx <- with(abStats, tight(cbind(med, sd)))
 
     clustKmeans <- function(dat, minK = 2)
@@ -595,10 +596,13 @@ postSubSample.tight <- function(subSampleSol, abThresh = 0.6, dQuant = 0.5)
     # colIdx <- clustKmeans(cbind(dQuant, dSd))
     colIdx <- clustKmeans(cbind(dQuant))
 
-    list(rowIdx = rowIdx, colIdx = colIdx)
+    return(list(abDat = abStats, cluster = list(rowIdx = rowIdx, colIdx = colIdx)))
 }
 
 
+debug(postSubSample.pca)
+
+# XXX: This is the best performing method
 postSubSample.pca <- function(subSampleSol, abThresh = 0.6, dQuant = 0.5)
 {
     # rows are different permutations,
@@ -606,33 +610,32 @@ postSubSample.pca <- function(subSampleSol, abThresh = 0.6, dQuant = 0.5)
     ab <- t(sapply(subSampleSol, function (x) abs(x$ab)))
     d <- t(sapply(subSampleSol, function (x) x$d))
 
-
-    abMed <- apply(ab, 2, median, na.rm = T)
-    for (col in 1:ncol(ab))
+    bootStrapNAs <- function(dat, lwr, upr)
     {
-        rng <- quantile(ab[,col], probs = c(0.05, 0.95), na.rm = T)
-        whichValid <- which(rng[1] <= ab[,col] & ab[,col] <= rng[2])
-        nNa <- sum(is.na(ab[,col]))
-        ab[is.na(ab[,col]), col] <- ab[sample(whichValid, nNa, replace = T), col]
+        for (col in 1:ncol(dat))
+        {
+            rng <- quantile(dat[,col], probs = c(lwr, upr), na.rm = T)
+            whichValid <- which(rng[1] <= dat[,col] & dat[,col] <= rng[2])
+            nNa <- sum(is.na(dat[,col]))
+            dat[is.na(dat[,col]), col] <- dat[sample(whichValid, nNa, replace = T), col]
+        }
+
+        return(dat)
     }
 
+    ab <- bootStrapNAs(ab, 0.05, 0.95)
 
-    # first, 
     pcaAB <- prcomp(ab, center = F, scale. = F)
     pcaAB$rotation <- as.data.frame(data.matrix(as.data.frame(pcaAB$rotation, stringsAsFactors = F)))
-    #pcaAB$rotation <- cbind(pcaAB$rotation, inBC = c(rep("bc", 300), rep("bg", 1200)))
 
+    pcaAB$rotation[,"mean"] <- apply(ab, 2, mean, na.rm = T)
+    pcaAB$rotation[,"sd"] <- apply(ab, 2, sd, na.rm = T)
     pcaAB$rotation[,"median"] <- apply(ab, 2, median, na.rm = T)
     pcaAB$rotation[,"var"] <- apply(ab, 2, var, na.rm = T)
+    pcaAB$rotation[,"cov"] <- with(pcaAB$rotation, sd / mean)
 
-    # gg <- ggplot(pcaAB$rotation, aes(x = PC1, y = PC2, colour = inBC))
-    # gg <- ggplot(pcaAB$rotation, aes(x = PC1, y = median, colour = inBC))
-    # gg <- ggplot(pcaAB$rotation, aes(x = PC1, y = var, colour = inBC))
-    # gg <- ggplot(pcaAB$rotation, aes(x = median, y = median, colour = inBC))
-    # gg + geom_point()
-    # ggsave("../img/pcaMvnNoCenterNoScale.pdf")
+    # dim(sweep(pcaAB$rotation, pcaAB$sdev, `*`))
 
-    # plot(pcaAB$rotation[,"PC1"], pcaAB$rotation[,"PC2"])
 
     dQuant <- apply(d, 2, quantile, probs = dQuant, na.rm = T)
     dSd <- apply(d, 2, sd, na.rm = T)
@@ -642,7 +645,7 @@ postSubSample.pca <- function(subSampleSol, abThresh = 0.6, dQuant = 0.5)
     tight <- function(dat, minK = 2, maxK = 7, thresh = abThresh)
     {
         # TODO: Investigate how performs w/ and w/o scaling
-        dat <- scale(dat)
+        # dat <- scale(dat)
         getBestClust <- function(df, theK)
         {
             kRes <- kmeans(df, theK, nstart = 20)
@@ -661,24 +664,106 @@ postSubSample.pca <- function(subSampleSol, abThresh = 0.6, dQuant = 0.5)
                          vScore( clusts[[curK - minK]], clusts[[curK - minK + 1]] )
                      })
         vsGt <- min(which(vs >= thresh))
+        if (is.infinite(vsGt))
+        {
+            vsGt <- which.max(vs)
+            cat("Error: threshold (", thresh, 
+                ") is too low. Best I could do is ", vs[vsGt], "\n")
+        }
         bestK <- minK + vsGt
 
         cat("Choosing tight cluster: ", bestK, "\n")
         getBestClust(dat, bestK)
     }
 
-    # tight2 <- function(dat)
-    # {
-    #     tc <- tight.clust(dat, 1, 3, standardize.gene = F, top.can = 1)
-    # }
+    # rowIdx <- with(pcaAB$rotation, tight(PC1))
+    # rowIdx <- with(pcaAB$rotation, tight(cbind(PC1, PC2, cov)))
 
-    # rowIdx <- with(abStats, tight(cbind(medRate, sd)))
-    # rowIdx <- with(abStats, tight(cbind(medRate)))
-    # rowIdx <- with(abStats, tight(cbind(med, sd)))
+    # cat("**Number of rows in clust: ", length(rowIdx), "\n")
 
-    # rowIdx <- with(pcaAB$rotation, tight(cbind(median, PC1, PC2)))
-    # rowIdx <- with(pcaAB$rotation, tight(cbind(median, PC1)))
-    rowIdx <- with(pcaAB$rotation, tight((PC1)))
+    clustKmeans <- function(dat, minK = 2)
+    {
+        gap <- clusGap(as.matrix(dat), kmeans, 5)
+        nk <- maxSE(gap$Tab[,"gap"], gap$Tab[,"SE.sim"])
+        if (nk == 1)
+            nk <- minK
+        cat("Conditions k: ", nk, "\n")
+        kRes <- kmeans(dat, nk, nstart = 20)
+        kMax <- which.max(kRes$centers[,1])
+
+        which(kRes$cluster == kMax)
+    }
+
+    # colIdx <- clustKmeans(cbind(dQuant, dSd))
+    # rowIdx <- clustKmeans(with(pcaAB$rotation, cbind(-PC1 * sdev[1], PC2 * sdev[2])))
+
+    df <- cbind(-pcaAB$rotation$PC1 * pcaAB$sdev[1], 
+                                pcaAB$rotation$PC2 * pcaAB$sdev[2])
+    rowIdx <- clustKmeans(df)
+    colIdx <- clustKmeans(cbind(dQuant))
+
+    # return(list(abDat = pcaAB$rotation, cluster = list(rowIdx = rowIdx, colIdx = colIdx)))
+    return(list(rowIdx = rowIdx, colIdx = colIdx))
+}
+
+postSubSample.tightPCA <- function(subSampleSol, abThresh = 0.6, dQuant = 0.5)
+{
+    # rows are different permutations,
+    # columns are the genes or conditions
+    ab <- t(sapply(subSampleSol, function (x) abs(x$ab)))
+    d <- t(sapply(subSampleSol, function (x) x$d))
+
+    bootStrapNAs <- function(dat, lwr, upr)
+    {
+        for (col in 1:ncol(dat))
+        {
+            rng <- quantile(dat[,col], probs = c(lwr, upr), na.rm = T)
+            whichValid <- which(rng[1] <= dat[,col] & dat[,col] <= rng[2])
+            nNa <- sum(is.na(dat[,col]))
+            dat[is.na(dat[,col]), col] <- dat[sample(whichValid, nNa, replace = T), col]
+        }
+
+        return(dat)
+    }
+
+    # replace NAs w/ a bootstrap
+    ab <- bootStrapNAs(ab, 0.05, 0.95)
+
+    pcaAB <- prcomp(ab, center = F, scale. = F)
+    pcaAB$rotation <- as.data.frame(data.matrix(as.data.frame(pcaAB$rotation, stringsAsFactors = F)))
+    pcaAB$rotation[,"median"] <- apply(ab, 2, median, na.rm = T)
+    pcaAB$rotation[,"mean"] <- apply(ab, 2, mean, na.rm = T)
+    pcaAB$rotation[,"var"] <- apply(ab, 2, var, na.rm = T)
+    pcaAB$rotation[,"sd"] <- apply(ab, 2, sd, na.rm = T)
+    pcaAB$rotation[,"cov"] <- pcaAB$rotation[,"sd"] / pcaAB$rotation[,"mean"]
+
+    dQuant <- apply(d, 2, quantile, probs = dQuant, na.rm = T)
+    dSd <- apply(d, 2, sd, na.rm = T)
+
+    # pcaAB$rotation[,c("PC2")] <- 0
+    pcaAB$rotation[,"zeros"] <- 0
+
+    # df <- pcaAB$rotation[,c("PC1", "PC2", "cov")]
+    df <- pcaAB$rotation[,c("PC1", "zeros")]
+    # df <- pcaAB$rotation[,c("PC1", "cov")]
+    # df <- pcaAB$rotation[,c("PC1", "PC2")]
+
+
+    # what if you remove the things that are so far away in distn
+    # toInc <- which(df[,1] <= quantile(df[,1], probs = 0.5) )
+    toInc <- which(df[,1] <= quantile(df[,1], probs = 1) )
+    tc <- tight.clust(df[toInc,], 5, 10, standardize.gene = F)
+    # tc <- tight.clust(df[toInc,], 2, 7, standardize.gene = F)
+    pcaAB$rotation[,"cluster"] <- -1
+    pcaAB$rotation[toInc,"cluster"] <- tc$cluster
+    pcaAB$rotation[,"cluster"] <- as.factor(pcaAB$rotation[,"cluster"])
+    clustCenter <- pcaAB$rotation %.% group_by(cluster) %.% summarize(center = mean(PC1)) 
+    minClust <- which.min(clustCenter$center)
+    # minClust <- 1
+
+    # rowIdx <- which(1  == pcaAB$rotation[,"cluster"])
+    rowIdx <- which(minClust  == pcaAB$rotation[,"cluster"])
+
 
     clustKmeans <- function(dat, minK = 2)
     {
@@ -696,9 +781,9 @@ postSubSample.pca <- function(subSampleSol, abThresh = 0.6, dQuant = 0.5)
     # colIdx <- clustKmeans(cbind(dQuant, dSd))
     colIdx <- clustKmeans(cbind(dQuant))
 
-    return(list(abDat = pcaAB$rotation, cluster = list(rowIdx = rowIdx, colIdx = colIdx)))
+    return(list(abDat = pcaAB$rotation, tc = tc$cluster, cluster = list(rowIdx = rowIdx, colIdx = colIdx)))
+    return(list(rowIdx = rowIdx, colIdx = colIdx))
 }
-
 
 
 postSubSample.mean.kmeans <- function(subSampleSol, abQuant = 0.5, dQuant = 0.5,
