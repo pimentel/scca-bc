@@ -1,4 +1,9 @@
 library(cluster)
+pca32 <- postSubSample.pca(condOpt.29.33$sol[[4]])
+pca32$dDat$rotation[,"norm1"] <- pca32$dDat$rotation[,"PC1"] * pca32$dDat$sdev[1]
+pca32$dDat$rotation[,"norm2"] <- pca32$dDat$rotation[,"PC2"] * pca32$dDat$sdev[2]
+ggplot(pca32$dDat$rotation, aes(x = norm1, y = norm2, colour = cluster)) + geom_point()
+library(gridExtra)
 
 
 # start by looking at "high" correlation in corMvn simulation
@@ -9,8 +14,69 @@ load("~/bc.RData")
 # look at one individual sim to see how it reacts to diff stats
 
 curSol <- sim50Mvn.sol.highCor$sol[[42]]$allBcSol[[1]]
+mat <- sim50Mvn.sol.highCor$data[[42]]$mat
 curSol <- sim50Mvn.sol.highCor$sol[[43]]$allBcSol[[1]]
 length(sim50Mvn.sol.highCor$sol[[42]]$allBcSol[[1]])
+
+tmpSol <- postSubSample.pca(curSol)
+
+simPlot <- corFigure(mat, tmpSol, T)
+simPlot <- simPlot + theme(legend.position = c(0.925,0.85), legend.title = element_blank())
+
+simPlot
+
+simPlot + guides(fill = guide_legend(label.position = "left")) + opts(legend.position = c(1,1))
+
+flyPlot <- corFigure(flyWorm, tmpPca, F)
+flyPlot <- flyPlot + theme(legend.position = "none")
+
+grid.arrange(simPlot, flyPlot, ncol = 2)
+dev.print(pdf, "~/Dropbox/biclustering/ismb/extAbstract/density.pdf")
+
+dev.print(pdf, "~/Dropbox/biclustering/ismb/extAbstract/hist.pdf")
+
+
+ct <- cor(t(mat[1:300, 1:30]))
+plot(density(ct[upper.tri(ct)]))
+
+corFigure <- function(data, sol, truth = FALSE)
+{
+    corClust <- cor(t(data[sol$rowIdx, sol$colIdx]))
+    corAll <- cbind(corClust[upper.tri(corClust)], "Bicluster")
+
+    ranRow <- sample.int(n = nrow(data), size = length(sol$rowIdx))
+    ranRowCor <- cor(t(data[ranRow, sol$colIdx]))
+    corAll <- rbind(corAll, cbind(ranRowCor[upper.tri(ranRowCor)], "Random rows"))
+
+
+    ranRow <- sample.int(n = nrow(data), size = length(sol$rowIdx))
+    ranCol <- sample.int(n = ncol(data), size = length(sol$colIdx))
+    bothRanCor <- cor(t(data[ranRow, ranCol]))
+    corAll <- rbind(corAll, cbind(bothRanCor[upper.tri(bothRanCor)], "Both random"))
+
+    allCond <- cor(t(data[sol$rowIdx,]))
+    corAll <- rbind(corAll, cbind(allCond[upper.tri(allCond)], "All conditions"))
+
+    if (truth)
+    {
+        corTruth <- cor(t(data[1:300, 1:30]))
+        corAll <- rbind(corAll, cbind(corTruth[upper.tri(corTruth)], "Truth"))
+    }
+
+    corAll <- as.data.frame(corAll, stringsAsFactors = F)
+    corAll[,1] <- as.numeric(corAll[,1])
+    colnames(corAll) <- c("Correlation", "Conditions")
+    
+    # ggplot(corAll, aes(x = Conditions, y = abs(Correlation), colour = Conditions)) + 
+    # ggplot(corAll, aes(x = Conditions, y = abs(Correlation), colour = Conditions)) + 
+    ggplot(corAll, aes(x = abs(Correlation), y = ..density.., colour = Conditions)) + 
+        # geom_density(aes(fill = Conditions), alpha = 0.5) + 
+        geom_histogram(aes(fill = Conditions), position = "dodge") + 
+        # geom_boxplot(aes(fill = Conditions), alpha = 0.5) + 
+        scale_fill_manual(values=cbbPalette) + 
+        scale_colour_manual(values=cbbPalette)
+}
+
 
 
 
@@ -178,6 +244,54 @@ ggplot(tmp$abDat, aes(x = median, colour = cluster)) + geom_density(aes(fill = c
 
 tmpPca <- postSubSample.pca(fwBC30)
 
+# figure for abstract
+corFW <- cor(t(flyWorm[tmpPca$rowIdx, tmpPca$colIdx]))
+corGG <- cbind(corFW[upper.tri(corFW)], "bc")
+
+set.seed(42)
+
+# http://www.cookbook-r.com/Graphs/Colors_(ggplot2)/#a-colorblind-friendly-palette 
+cbbPalette <- c("#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7", "#000000")
+
+
+# To use for fills, add
+scale_fill_manual(values=cbbPalette)
+
+# To use for line and point colors, add
+scale_colour_manual(values=cbbPalette)
+
+# get random genes
+ranRow <- sample.int(n = nrow(flyWorm), size = length(tmpPca$rowIdx))
+cor2 <- cor(t(flyWorm[ranRow, tmpPca$colIdx]))
+corGG <- rbind(corGG, cbind(cor2[upper.tri(cor2)], "ranRow"))
+
+# # get random conditions
+# ranCol <- sample.int(n = ncol(flyWorm), size = length(tmpPca$colIdx))
+# cor3 <- cor(t(flyWorm[tmpPca$rowIdx, ranCol]))
+# corGG <- rbind(corGG, cbind(cor3[upper.tri(cor3)], "ranCol"))
+
+# get random genes and conditions
+ranRow <- sample.int(n = nrow(flyWorm), size = length(tmpPca$rowIdx))
+ranCol <- sample.int(n = ncol(flyWorm), size = length(tmpPca$colIdx))
+cor4 <- cor(t(flyWorm[ranRow, ranCol]))
+corGG <- rbind(corGG, cbind(cor4[upper.tri(cor4)], "bothRan"))
+
+cor5 <- cor(t(flyWorm[tmpPca$rowIdx,]))
+corGG <- rbind(corGG, cbind(cor5[upper.tri(cor5)], "allCond"))
+
+corGG <- as.data.frame(corGG, stringsAsFactors = FALSE)
+corGG[,1] <- as.numeric(corGG[,1])
+colnames(corGG) <- c("Correlation", "Type")
+
+ggplot(corGG, aes(x = abs(Correlation), colour = Type)) + geom_density(aes(fill = Type), alpha = 0.5) + 
+    scale_fill_manual(values=cbbPalette) + 
+    scale_colour_manual(values=cbbPalette)
+
+ggsave("../ismb/extAbstract/cor.pdf")
+# Saving 8.02 x 3.44 in image
+
+ggplot(corGG, aes(x = abs(Correlation), colour = Type)) + geom_freqpoly(aes(fill = Type), alpha = 0.5)
+
 ggplot(tmpPca$abDat, aes(x = PC1, y = PC2, colour = cluster)) + geom_point()
 ggplot(tmpPca$abDat, aes(x = PC1, y = zeros, colour = cluster)) + geom_point()
 ggplot(tmpPca$abDat, aes(x = PC1, y = cov, colour = cluster)) + geom_point()
@@ -186,7 +300,7 @@ ggplot(tmpPca$abDat, aes(x = PC1, colour = cluster)) + geom_density()
 ggplot(tmpPca$abDat, aes(x = median, colour = cluster)) + geom_density()
 
 
-clust1 <- flybaseNames[which(tmp$abDat$cluster == 1)]
+elust1 <- flybaseNames[which(tmp$abDat$cluster == 1)]
 clust2 <- flybaseNames[which(tmp$abDat$cluster == 2)]
 clust3 <- flybaseNames[which(tmp$abDat$cluster == 3)]
 clust4 <- flybaseNames[which(tmp$abDat$cluster == 4)]
@@ -393,4 +507,77 @@ plotClusterExpression(fdr30p90Z , meow)
 
 fdr30p90[meow$rowIdx, ]
 
+
+# driver for condition seleciton
+curMat <- sim50Mvn.sol.highCor$data[[40]]$mat
+curMatZ <- t(scale(t(curMat)))
+
+debug(optConditionSize)
+condOpt.29.33 <- optConditionSize(curMat, 29, 33)
+condOpt.29.33.Z <- optConditionSize(curMatZ, 29, 33)
+save(curMat, curMatZ, condOpt.29.33, condOpt.29.33.Z, 
+     file = "condOpt.RData")
+
+### Look at all diff solutions & investigate why cond vector is small
+load("~/Dropbox/biclustering/bcSol/condOpt.RData", verbose = T)
+ggPlotParSolution(condOpt.29.33$sol[[1]])
+ggPlotParSolution(condOpt.29.33$sol[[2]])
+ggPlotParSolution(condOpt.29.33$sol[[3]])
+ggPlotParSolution(condOpt.29.33$sol[[4]])
+
+apply(getD(condOpt.29.33$sol[[1]]), 1, mean)
+
+pca30 <- postSubSample.pca(condOpt.29.33$sol[[2]])
+pca30$dDat$rotation[,"norm1"] <- pca30$dDat$rotation[,"PC1"] * pca30$dDat$sdev[1]
+pca30$dDat$rotation[,"norm2"] <- pca30$dDat$rotation[,"PC2"] * pca30$dDat$sdev[2]
+ggplot(pca30$dDat$rotation, aes(x = norm1, y = norm2, colour = cluster)) + geom_point()
+
+pca31 <- postSubSample.pca(condOpt.29.33$sol[[3]])
+pca31$dDat$rotation[,"norm1"] <- pca31$dDat$rotation[,"PC1"] * pca31$dDat$sdev[1]
+pca31$dDat$rotation[,"norm2"] <- pca31$dDat$rotation[,"PC2"] * pca31$dDat$sdev[2]
+ggplot(pca31$dDat$rotation, aes(x = norm1, y = norm2, colour = cluster)) + geom_point()
+
+pca32 <- postSubSample.pca(condOpt.29.33$sol[[4]])
+pca32$dDat$rotation[,"norm1"] <- pca32$dDat$rotation[,"PC1"] * pca32$dDat$sdev[1]
+pca32$dDat$rotation[,"norm2"] <- pca32$dDat$rotation[,"PC2"] * pca32$dDat$sdev[2]
+ggplot(pca32$dDat$rotation, aes(x = norm1, y = norm2, colour = cluster)) + geom_point()
+
+
+### Look at Z transformed
+ggPlotParSolution(condOpt.29.33.Z$sol[[1]])
+ggPlotParSolution(condOpt.29.33.Z$sol[[2]])
+ggPlotParSolution(condOpt.29.33.Z$sol[[3]])
+ggPlotParSolution(condOpt.29.33.Z$sol[[4]])
+
+pca31 <- postSubSample.pca(condOpt.29.33.Z$sol[[2]])
+pca31$dDat$rotation[,"norm1"] <- pca31$dDat$rotation[,"PC1"] * pca31$dDat$sdev[1]
+pca31$dDat$rotation[,"norm2"] <- pca31$dDat$rotation[,"PC2"] * pca31$dDat$sdev[2]
+ggplot(pca31$dDat$rotation, aes(x = norm1, y = norm2, colour = cluster)) + geom_point()
+
+pca33 <- postSubSample.pca(condOpt.29.33$sol[[4]])
+pca33$dDat$rotation[,"norm1"] <- pca33$dDat$rotation[,"PC1"] * pca33$dDat$sdev[1]
+pca33$dDat$rotation[,"norm2"] <- pca33$dDat$rotation[,"PC2"] * pca33$dDat$sdev[2]
+ggplot(pca33$dDat$rotation, aes(x = norm1, y = norm2, colour = cluster)) + geom_point()
+ggPlotParSolution(condOpt.29.33$sol[[4]])
+###
+
+ggPlotExpression(curMatZ[1:600, ])
+
+fullSol <- biclusteringPar(curMat, lam.lwr = 20, lam = 30)
+psFullSol <- postSubSample.pca(fullSol)
+
+ssSol <- bcSubSamplePar(curMat, lam.lwr = 20, lam = 30)
+save(ssSol, curMat, psSol, fullSol, file = "problemSim.RData")
+
+load("~/Dropbox/biclustering/bcSol/problemSim.RData", verbose= T)
+
+# These are the sims w/ problems
+ggPlotParSolution(fullSol)
+debugonce(ggPlotParSolution)
+
+ggPlotParSolution(sim50Mvn.sol.highCor$sol[[42]]$allBcSol[[1]])
+
+psSol <- postSubSample.pca(ssSol)
+
+ssSolZ <- bcSubSamplePar(curMatZ, lam.lwr = 20, lam = 30)
 

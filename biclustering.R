@@ -99,11 +99,17 @@ biClustMax.optim <- function(xDf, yDf, d.start, a, b, lam, verbose = TRUE, optim
     constrMat <- rbind(constrMat, -diag(length(q)))
     # regularize (sum(d) <= lam)
     constrMat <- rbind(constrMat, rep.int(-1, length(q)))
-    # regularize (sum(d) >= lam.lwr)
-    constrMat <- rbind(constrMat, rep.int(1, length(q)))
     constrLimit <- c(rep(0, length(q)), 
                      rep(-1, length(q)),
-                     -lam, lam.lwr)
+                     -lam)
+
+    # FIXME: temporary until I figure out what is wrong with this function...
+    # regularize (sum(d) >= lam.lwr)
+    # constrMat <- rbind(constrMat, rep.int(1, length(q)))
+    # constrLimit <- c(rep(0, length(q)), 
+    #                  rep(-1, length(q)),
+    #                  -lam, lam.lwr)
+
     objectiveFn <- function(d, qVec)
     {
         # sum(0.5 * d^2 * qVec)
@@ -175,25 +181,37 @@ maximizeOneSplit <- function(geneDf, lam, epsA = 0.1, epsB = 0.1, epsD = 0.1, ma
     d <- 0
     minUnif <- 0.05
     maxUnif <- 1
-    repeat {
-        d <- runif(ncol(xDf), min = minUnif, max = maxUnif)
-        sumD <- sum(d)
-        if (sumD <= lam & sumD >= lam.lwr)
+
+    repeat { 
+        d <- runif(ncol(xDf), max = maxUnif)
+        if (sum(d) <= lam)
             break
-        else if (sumD < lam.lwr)
-            minUnif <- min(minUnif + 0.03, maxUnif - 0.03)
         else
-            maxUnif <- max(minUnif + 0.04, maxUnif - 0.04)
+            maxUnif <- min(0.05, maxUnif - 0.05)
     }
-    if (sum(d) < lam.lwr)
-    {
-        cat("ERROR! sum(d) < lam.lwr\n")
-        cat("ERROR! sum(d) < lam.lwr\n")
-        cat("ERROR! sum(d) < lam.lwr\n")
-        cat("ERROR! sum(d) < lam.lwr\n")
-        cat("ERROR! sum(d) < lam.lwr\n")
-        cat("ERROR! sum(d) < lam.lwr\n")
-    }
+
+    # FIXME: temporarily commenting out until figure out why not working correctly
+    # UPDATE: This bug appears when force there to be a minimum number of conditions which are being selected
+    # repeat {
+    #     d <- runif(ncol(xDf), min = minUnif, max = maxUnif)
+    #     sumD <- sum(d)
+    #     if (sumD <= lam & sumD >= lam.lwr)
+    #         break
+    #     else if (sumD < lam.lwr)
+    #         minUnif <- min(minUnif + 0.03, maxUnif - 0.03)
+    #     else
+    #         maxUnif <- max(minUnif + 0.04, maxUnif - 0.04)
+
+    # }
+    # if (sum(d) < lam.lwr)
+    # {
+    #     cat("ERROR! sum(d) < lam.lwr\n")
+    #     cat("ERROR! sum(d) < lam.lwr\n")
+    #     cat("ERROR! sum(d) < lam.lwr\n")
+    #     cat("ERROR! sum(d) < lam.lwr\n")
+    #     cat("ERROR! sum(d) < lam.lwr\n")
+    #     cat("ERROR! sum(d) < lam.lwr\n")
+    # }
     cat("sum(d)", sum(d), "\n") 
     # NB: values of a and b are not important currently since evaluated after d is set.
     # If ever change the order, fix this.
@@ -246,11 +264,11 @@ maximizeOneSplit <- function(geneDf, lam, epsA = 0.1, epsB = 0.1, epsD = 0.1, ma
 #' @param geneDf data.frame with genes on rows and columns defining conditions
 #' @param nSamples integer denoting the number of permutations to perform
 #' @param lam regularization parameter for conditions (maximum number of conditions allows in a bicluster)
-biclusteringPar <- function(geneDf, nSamples = 100, lam)
+biclusteringPar <- function(geneDf, nSamples = 100, lam, lam.lwr = 3.5)
 {
     mclapply(1:nSamples, function(it) {
              cat("Biclustering iteration: ", it, "\n")
-             curSol <- maximizeOneSplit(geneDf, lam)
+             curSol <- maximizeOneSplit(geneDf, lam = lam, lam.lwr = lam.lwr)
              return(curSol)
             })
 }
@@ -634,52 +652,9 @@ postSubSample.pca <- function(subSampleSol, abThresh = 0.6, dQuant = 0.5)
     pcaAB$rotation[,"var"] <- apply(ab, 2, var, na.rm = T)
     pcaAB$rotation[,"cov"] <- with(pcaAB$rotation, sd / mean)
 
-    # dim(sweep(pcaAB$rotation, pcaAB$sdev, `*`))
-
-
+    pcaD <- prcomp(d, center = F, scale. = F)
     dQuant <- apply(d, 2, quantile, probs = dQuant, na.rm = T)
     dSd <- apply(d, 2, sd, na.rm = T)
-
-    # test <- tight.clust(pcaAB$rotation[,c("PC1", "PC2")], 1, 3, standardize.gene = F, top.can = 1)
-
-    tight <- function(dat, minK = 2, maxK = 7, thresh = abThresh)
-    {
-        # TODO: Investigate how performs w/ and w/o scaling
-        # dat <- scale(dat)
-        getBestClust <- function(df, theK)
-        {
-            kRes <- kmeans(df, theK, nstart = 20)
-            # kMax <- which.max(kRes$centers[,1])
-            kMax <- which.min(kRes$centers[,1])
-
-            which(kRes$cluster == kMax)
-
-        }
-        clusts <- lapply(minK:maxK, function(curK)
-                         {
-                             getBestClust(dat, curK)
-                         })
-        vs <- sapply((minK+1):maxK, function(curK)
-                     {
-                         vScore( clusts[[curK - minK]], clusts[[curK - minK + 1]] )
-                     })
-        vsGt <- min(which(vs >= thresh))
-        if (is.infinite(vsGt))
-        {
-            vsGt <- which.max(vs)
-            cat("Error: threshold (", thresh, 
-                ") is too low. Best I could do is ", vs[vsGt], "\n")
-        }
-        bestK <- minK + vsGt
-
-        cat("Choosing tight cluster: ", bestK, "\n")
-        getBestClust(dat, bestK)
-    }
-
-    # rowIdx <- with(pcaAB$rotation, tight(PC1))
-    # rowIdx <- with(pcaAB$rotation, tight(cbind(PC1, PC2, cov)))
-
-    # cat("**Number of rows in clust: ", length(rowIdx), "\n")
 
     clustKmeans <- function(dat, minK = 2)
     {
@@ -700,9 +675,16 @@ postSubSample.pca <- function(subSampleSol, abThresh = 0.6, dQuant = 0.5)
     df <- cbind(-pcaAB$rotation$PC1 * pcaAB$sdev[1], 
                                 pcaAB$rotation$PC2 * pcaAB$sdev[2])
     rowIdx <- clustKmeans(df)
-    colIdx <- clustKmeans(cbind(dQuant))
+    df2 <- cbind(-pcaD$rotation[,"PC1"] * pcaD$sdev[1]) 
+                 # pcaD$rotation[,"PC2"] * pcaD$sdev[2])
+    colIdx <- clustKmeans(df2)
+    # colIdx <- clustKmeans(cbind(dQuant))
 
-    # return(list(abDat = pcaAB$rotation, cluster = list(rowIdx = rowIdx, colIdx = colIdx)))
+    pcaD$rotation <- data.frame(pcaD$rotation)
+    pcaD$rotation[,"cluster"] <- "background"
+    pcaD$rotation[colIdx,"cluster"] <- "bicluster"
+
+    return(list(abDat = pcaAB$rotation, dDat = pcaD, cluster = list(rowIdx = rowIdx, colIdx = colIdx)))
     return(list(rowIdx = rowIdx, colIdx = colIdx))
 }
 
@@ -785,6 +767,54 @@ postSubSample.tightPCA <- function(subSampleSol, abThresh = 0.6, dQuant = 0.5)
     return(list(rowIdx = rowIdx, colIdx = colIdx))
 }
 
+# TODO: include minimum condition size to be 3
+# TODO: run this for 20 - 50
+# TODO: For selecting the "optimal" condition, look at average correlation plot
+# (should increase to a flat region) and also look at the number of conditions
+# selected. Should also flatten out
+
+optConditionSize <- function(df, minLam, maxLam, cutoff = 0.6, 
+                             postProcess = postSubSample.pca, ...)
+{
+    D <- as.data.frame(matrix(0, nrow = maxLam - minLam + 1, ncol = ncol(df)))
+    rownames(D) <- minLam:maxLam
+    sols <- list()
+    it <- 1
+    for (l in minLam:maxLam)
+    {
+        cat("Doing optimization for lambda = ", l, "\n")
+
+        # temporarily supress output
+        sink("/dev/null")
+        compTime <- system.time({
+            curSol <- bcSubSamplePar(df, lam = l, lam.lwr = max(l - 2, 5))
+            sols[[it]] <- curSol
+            curClust <- postProcess(curSol, ...)
+            D[it, curClust$colIdx] <- 1
+            it <- it + 1
+        })
+        sink()
+        print(compTime)
+        cat(length(curClust$colIdx), "\n")
+    }
+
+    return(list(sol = sols, D = D))
+}
+
+# Each row is a gene, each column is a different iteration
+getA <- function(bcSol, takeAbs = TRUE)
+{
+    if (takeAbs)
+        return( abs(sapply(bcSol, function (x) x$ab)) )
+
+    sapply(bcSol, function (x) x$ab)
+}
+
+# Each row is a condition, each column is a different iteration
+getD <- function(bcSol)
+{
+    sapply(bcSol, function (x) x$d)
+}
 
 postSubSample.mean.kmeans <- function(subSampleSol, abQuant = 0.5, dQuant = 0.5,
                                       seMethod = "firstSEmax")
@@ -962,8 +992,6 @@ bcMultipleClusters <- function(geneDf, lam, nClusters, nSamples = 100)
 }
 
 
-
-
 bcMultipleClusters.kmeans <- function(geneDf, lam, nClusters, nSamples = 100)
 {
     allBcSol <- list()
@@ -1028,14 +1056,9 @@ bcMultipleClusters.kmeans <- function(geneDf, lam, nClusters, nSamples = 100)
     return(list(allBcSol = allBcSol, clusters = clusters))
 }
 
-plotClusterExpression <- function(dat, clust)
-{
-    ggPlotExpression(dat[clust$rowIdx, clust$colIdx])
-}
 
 
-
-#' XXX: OBSOLETE! This is mostly still here for testing... 
+# XXX: OBSOLETE! This is mostly still here for testing... 
 biclustering <- function(geneDf, nSamples = 100)
 {
     it <- 1

@@ -3,7 +3,6 @@ library(mvtnorm)
 library(lattice)
 library(gplots)
 library(clusterGeneration) #genPositiveDefMat
-# library(MASS)
 
 ##' Function to generate normal noise and Gaussian blocks
 ##' 
@@ -868,67 +867,5 @@ plotParSolution(iid.fullSample)
 iid.subSample <- bcSubSamplePar(iidN.block, 15, 2, 0.6)
 
 
-debugonce(ggPlotParSolution)
-
-ggPlotParSolution <- function(parSol, fBase = NA, rowNames = NA,
-                              colNames = NA)
-{
-    par(ask = FALSE)
-    A <- abs(sapply(parSol, function (x) x$ab))
-    D <- sapply(parSol, function (x) x$d)
-    dRot <- 0
-    dxSize <- 14
-    fSize <- 1.5
-    if (!is.na(rowNames)[1])
-    {
-        rownames(A) <- rowNames
-    }
-    if (!is.na(colNames)[1])
-    {
-        rownames(D) <- colNames
-        dRot <- 90
-        dxSize <- 10
-        fSize = 1
-    }
-    meltA <- melt(t(A))
-    colnames(meltA) <- c("x", "y", "value")
-    breaksA <- round(seq(0, max(meltA$value, na.rm = T), length.out = 10), 3)
-    p <- ggplot(meltA, aes(x, y, fill = value))
-    p <- p + geom_tile() + scale_fill_gradient(low = "firebrick2", high = "yellow", 
-                                               guide = guide_legend(title = "Coefficient", reverse = T), 
-                                               breaks = breaksA) 
-
-    p <- p + xlab("Iteration") + ylab("Feature") + theme_bw() + theme(axis.text.x=element_text(size=14),
-                                                                      axis.text.y=element_text(size=14), 
-                                                                      axis.title=element_text(size=15),
-                                                                      legend.text=element_text(size=14),
-                                                                      legend.title=element_text(size=14))
-    print(p)
-    readline("Next [Enter]\t")
-    if (!is.na(fBase))
-        ggsave(paste("../img/gg", fBase, "Feature.pdf", sep = ""), 
-               width = 6.62, height = 12.8)
-    meltD <- melt(D)
-    colnames(meltD) <- c("x", "y", "value")
-    breaksD <- round(seq(0, max(meltD$value, na.rm = T), length.out = 10), 1)
-    p <- ggplot(meltD, aes(x, y, fill = value))
-    p <- p + geom_tile() + scale_fill_gradient(low = "firebrick2", high = "yellow", 
-                                               guide = guide_legend(title = "Coefficient", reverse = T), 
-                                               breaks = breaksD) 
-    p <- p + xlab("Condition") + ylab("Iteration") + theme_bw() + theme(axis.text.x=element_text(size=dxSize,
-                                                                                                 angle = dRot),
-                                                    axis.text.y=element_text(size=14), 
-                                                    axis.title =element_text(size=15),
-                                                    legend.text=element_text(size=14),
-                                                    legend.title=element_text(size=14))
-    print(p)
-    readline("Next [Enter]\t")
-    if (!is.na(fBase))
-        ggsave(paste("../img/gg", fBase, "Cond.pdf", sep = ""),
-               width = 6.62, height = 12.8)
-
-    # Saving 6.62 x 12.8 in image
-    return(NULL)
-}
 
 ggPlotParSolution(nearMedMvn, )
