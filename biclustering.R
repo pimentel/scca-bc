@@ -5,7 +5,7 @@
 library(scca)
 library(MASS)
 library(Matrix)
-library(multicore)
+library(parallel)
 
 debug(biClustMax.optim)
 undebug(biClustMax.optim)
@@ -296,6 +296,112 @@ bcSubSamplePar <- function(geneDf, nSamples = 100, lam, propSample = 0.6, lam.lw
              return(list(ab = abSol, d = d, sccaLam = curSol$sccaLam))
                            })
 }
+
+debug(postSubSample.pca)
+
+# XXX: This is the best performing method
+postSubSample.pca <- function(subSampleSol, abThresh = 0.6, dQuant = 0.5)
+{
+    # rows are different permutations,
+    # columns are the genes or conditions
+    ab <- t(sapply(subSampleSol, function (x) abs(x$ab)))
+    d <- t(sapply(subSampleSol, function (x) x$d))
+
+    bootStrapNAs <- function(dat, lwr, upr)
+    {
+        for (col in 1:ncol(dat))
+        {
+            rng <- quantile(dat[,col], probs = c(lwr, upr), na.rm = T)
+            whichValid <- which(rng[1] <= dat[,col] & dat[,col] <= rng[2])
+            nNa <- sum(is.na(dat[,col]))
+            dat[is.na(dat[,col]), col] <- dat[sample(whichValid, nNa, replace = T), col]
+        }
+
+        return(dat)
+    }
+
+    ab <- bootStrapNAs(ab, 0.05, 0.95)
+
+    pcaAB <- prcomp(ab, center = F, scale. = F)
+    pcaAB$rotation <- as.data.frame(data.matrix(as.data.frame(pcaAB$rotation, stringsAsFactors = F)))
+
+    pcaAB$rotation[,"mean"] <- apply(ab, 2, mean, na.rm = T)
+    pcaAB$rotation[,"sd"] <- apply(ab, 2, sd, na.rm = T)
+    pcaAB$rotation[,"median"] <- apply(ab, 2, median, na.rm = T)
+    pcaAB$rotation[,"var"] <- apply(ab, 2, var, na.rm = T)
+    pcaAB$rotation[,"cov"] <- with(pcaAB$rotation, sd / mean)
+
+    pcaD <- prcomp(d, center = F, scale. = F)
+    dQuant <- apply(d, 2, quantile, probs = dQuant, na.rm = T)
+    dSd <- apply(d, 2, sd, na.rm = T)
+
+    clustKmeans <- function(dat, minK = 2)
+    {
+        gap <- clusGap(as.matrix(dat), kmeans, 5)
+        nk <- maxSE(gap$Tab[,"gap"], gap$Tab[,"SE.sim"])
+        if (nk == 1)
+            nk <- minK
+        cat("Conditions k: ", nk, "\n")
+        kRes <- kmeans(dat, nk, nstart = 20)
+        kMax <- which.max(kRes$centers[,1])
+
+        which(kRes$cluster == kMax)
+    }
+
+    # colIdx <- clustKmeans(cbind(dQuant, dSd))
+    # rowIdx <- clustKmeans(with(pcaAB$rotation, cbind(-PC1 * sdev[1], PC2 * sdev[2])))
+
+    df <- cbind(-pcaAB$rotation$PC1 * pcaAB$sdev[1], 
+                                pcaAB$rotation$PC2 * pcaAB$sdev[2])
+    rowIdx <- clustKmeans(df)
+    df2 <- cbind(-pcaD$rotation[,"PC1"] * pcaD$sdev[1]) 
+                 # pcaD$rotation[,"PC2"] * pcaD$sdev[2])
+    colIdx <- clustKmeans(df2)
+    # colIdx <- clustKmeans(cbind(dQuant))
+
+    pcaD$rotation <- data.frame(pcaD$rotation)
+    pcaD$rotation[,"cluster"] <- "background"
+    pcaD$rotation[colIdx,"cluster"] <- "bicluster"
+
+    # return(list(abDat = pcaAB$rotation, dDat = pcaD, cluster = list(rowIdx = rowIdx, colIdx = colIdx)))
+    return(list(rowIdx = rowIdx, colIdx = colIdx))
+}
+
+# TODO: include minimum condition size to be 3
+# TODO: run this for 20 - 50
+# TODO: For selecting the "optimal" condition, look at average correlation plot
+# (should increase to a flat region) and also look at the number of conditions
+# selected. Should also flatten out
+
+optConditionSize <- function(df, minLam, maxLam, cutoff = 0.6, 
+                             bcMethod = bcSubSamplePar, 
+                             postProcess = postSubSample.pca, ...)
+{
+    D <- as.data.frame(matrix(0, nrow = maxLam - minLam + 1, ncol = ncol(df)))
+    rownames(D) <- minLam:maxLam
+    sols <- list()
+    it <- 1
+    for (l in minLam:maxLam)
+    {
+        cat("Doing optimization for lambda = ", l, "\n")
+
+        # temporarily supress output
+        sink("/dev/null")
+        compTime <- system.time({
+            curSol <- bcMethod(df, lam = l, lam.lwr = 3)
+            sols[[it]] <- curSol
+            curClust <- postProcess(curSol, ...)
+            D[it, curClust$colIdx] <- 1
+            it <- it + 1
+        })
+        sink()
+        print(compTime)
+        cat(length(curClust$colIdx), "\n")
+    }
+
+    return(list(sol = sols, D = D))
+}
+
 
 postSubSample <- function(subSampleSol, percentile = 0.75)
 {
@@ -618,75 +724,6 @@ postSubSample.tight <- function(subSampleSol, abThresh = 0.6, dQuant = 0.5)
 }
 
 
-debug(postSubSample.pca)
-
-# XXX: This is the best performing method
-postSubSample.pca <- function(subSampleSol, abThresh = 0.6, dQuant = 0.5)
-{
-    # rows are different permutations,
-    # columns are the genes or conditions
-    ab <- t(sapply(subSampleSol, function (x) abs(x$ab)))
-    d <- t(sapply(subSampleSol, function (x) x$d))
-
-    bootStrapNAs <- function(dat, lwr, upr)
-    {
-        for (col in 1:ncol(dat))
-        {
-            rng <- quantile(dat[,col], probs = c(lwr, upr), na.rm = T)
-            whichValid <- which(rng[1] <= dat[,col] & dat[,col] <= rng[2])
-            nNa <- sum(is.na(dat[,col]))
-            dat[is.na(dat[,col]), col] <- dat[sample(whichValid, nNa, replace = T), col]
-        }
-
-        return(dat)
-    }
-
-    ab <- bootStrapNAs(ab, 0.05, 0.95)
-
-    pcaAB <- prcomp(ab, center = F, scale. = F)
-    pcaAB$rotation <- as.data.frame(data.matrix(as.data.frame(pcaAB$rotation, stringsAsFactors = F)))
-
-    pcaAB$rotation[,"mean"] <- apply(ab, 2, mean, na.rm = T)
-    pcaAB$rotation[,"sd"] <- apply(ab, 2, sd, na.rm = T)
-    pcaAB$rotation[,"median"] <- apply(ab, 2, median, na.rm = T)
-    pcaAB$rotation[,"var"] <- apply(ab, 2, var, na.rm = T)
-    pcaAB$rotation[,"cov"] <- with(pcaAB$rotation, sd / mean)
-
-    pcaD <- prcomp(d, center = F, scale. = F)
-    dQuant <- apply(d, 2, quantile, probs = dQuant, na.rm = T)
-    dSd <- apply(d, 2, sd, na.rm = T)
-
-    clustKmeans <- function(dat, minK = 2)
-    {
-        gap <- clusGap(as.matrix(dat), kmeans, 5)
-        nk <- maxSE(gap$Tab[,"gap"], gap$Tab[,"SE.sim"])
-        if (nk == 1)
-            nk <- minK
-        cat("Conditions k: ", nk, "\n")
-        kRes <- kmeans(dat, nk, nstart = 20)
-        kMax <- which.max(kRes$centers[,1])
-
-        which(kRes$cluster == kMax)
-    }
-
-    # colIdx <- clustKmeans(cbind(dQuant, dSd))
-    # rowIdx <- clustKmeans(with(pcaAB$rotation, cbind(-PC1 * sdev[1], PC2 * sdev[2])))
-
-    df <- cbind(-pcaAB$rotation$PC1 * pcaAB$sdev[1], 
-                                pcaAB$rotation$PC2 * pcaAB$sdev[2])
-    rowIdx <- clustKmeans(df)
-    df2 <- cbind(-pcaD$rotation[,"PC1"] * pcaD$sdev[1]) 
-                 # pcaD$rotation[,"PC2"] * pcaD$sdev[2])
-    colIdx <- clustKmeans(df2)
-    # colIdx <- clustKmeans(cbind(dQuant))
-
-    pcaD$rotation <- data.frame(pcaD$rotation)
-    pcaD$rotation[,"cluster"] <- "background"
-    pcaD$rotation[colIdx,"cluster"] <- "bicluster"
-
-    # return(list(abDat = pcaAB$rotation, dDat = pcaD, cluster = list(rowIdx = rowIdx, colIdx = colIdx)))
-    return(list(rowIdx = rowIdx, colIdx = colIdx))
-}
 
 postSubSample.tightPCA <- function(subSampleSol, abThresh = 0.6, dQuant = 0.5)
 {
@@ -767,40 +804,6 @@ postSubSample.tightPCA <- function(subSampleSol, abThresh = 0.6, dQuant = 0.5)
     return(list(rowIdx = rowIdx, colIdx = colIdx))
 }
 
-# TODO: include minimum condition size to be 3
-# TODO: run this for 20 - 50
-# TODO: For selecting the "optimal" condition, look at average correlation plot
-# (should increase to a flat region) and also look at the number of conditions
-# selected. Should also flatten out
-
-optConditionSize <- function(df, minLam, maxLam, cutoff = 0.6, 
-                             bcMethod = bcSubSamplePar, 
-                             postProcess = postSubSample.pca, ...)
-{
-    D <- as.data.frame(matrix(0, nrow = maxLam - minLam + 1, ncol = ncol(df)))
-    rownames(D) <- minLam:maxLam
-    sols <- list()
-    it <- 1
-    for (l in minLam:maxLam)
-    {
-        cat("Doing optimization for lambda = ", l, "\n")
-
-        # temporarily supress output
-        sink("/dev/null")
-        compTime <- system.time({
-            curSol <- bcMethod(df, lam = l, lam.lwr = 3)
-            sols[[it]] <- curSol
-            curClust <- postProcess(curSol, ...)
-            D[it, curClust$colIdx] <- 1
-            it <- it + 1
-        })
-        sink()
-        print(compTime)
-        cat(length(curClust$colIdx), "\n")
-    }
-
-    return(list(sol = sols, D = D))
-}
 
 # Each row is a gene, each column is a different iteration
 getA <- function(bcSol, takeAbs = TRUE)
