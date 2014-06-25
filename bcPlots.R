@@ -1,0 +1,199 @@
+debugonce(ggPlotParSolution)
+
+ggPlotParSolution <- function(parSol, clust = NA, fBase = NA, rowNames = NA,
+                              colNames = NA)
+{
+    par(ask = FALSE)
+    A <- abs(sapply(parSol, function (x) x$ab))
+    D <- sapply(parSol, function (x) x$d)
+
+    if (!is.na(clust)[1])
+    {
+        # TODO: make sure valid cluster (i.e. has rowIdx, colIdx)
+        rowOrder <- c(clust$rowIdx, setdiff(1:nrow(A), clust$rowIdx))
+        colOrder <- c(clust$colIdx, setdiff(1:nrow(D), clust$colIdx))
+        A <- A[rowOrder,]
+        D <- D[colOrder,]
+    }
+    dRot <- 0
+    dxSize <- 14
+    fSize <- 1.5
+    if (!is.na(rowNames)[1])
+    {
+        rownames(A) <- rowNames
+    }
+    if (!is.na(colNames)[1])
+    {
+        rownames(D) <- colNames
+        dRot <- 90
+        dxSize <- 10
+        fSize = 1
+    }
+    meltA <- melt(t(A))
+    colnames(meltA) <- c("x", "y", "value")
+    breaksA <- round(seq(0, max(meltA$value, na.rm = T), length.out = 10), 3)
+    p <- ggplot(meltA, aes(x, y, fill = value))
+    p <- p + geom_tile() + scale_fill_gradient(low = "firebrick2", high = "yellow", 
+                                               guide = guide_legend(title = "Coefficient", reverse = T), 
+                                               breaks = breaksA) 
+
+    p <- p + xlab("Iteration") + ylab("Feature") + theme_bw() + 
+        theme(axis.text.x=element_text(size=14),
+              axis.text.y=element_text(size=14), 
+              axis.title=element_text(size=15), 
+              legend.text=element_text(size=14), 
+              legend.title=element_text(size=14))
+
+    print(p)
+    readline("Next [Enter]\t")
+    if (!is.na(fBase))
+        ggsave(paste("../img/gg", fBase, "Feature.pdf", sep = ""), 
+               width = 6.62, height = 12.8)
+    meltD <- melt(D)
+    colnames(meltD) <- c("x", "y", "value")
+    breaksD <- round(seq(0, max(meltD$value, na.rm = T), length.out = 10), 1)
+    p <- ggplot(meltD, aes(x, y, fill = value))
+    p <- p + geom_tile() + scale_fill_gradient(low = "firebrick2", high = "yellow", 
+                                               guide = guide_legend(title = "Coefficient", reverse = T), 
+                                               breaks = breaksD) 
+    p <- p + xlab("Condition") + ylab("Iteration") + theme_bw() + theme(axis.text.x=element_text(size=dxSize,
+                                                                                                 angle = dRot),
+                                                    axis.text.y=element_text(size=14), 
+                                                    axis.title =element_text(size=15),
+                                                    legend.text=element_text(size=14),
+                                                    legend.title=element_text(size=14))
+    print(p)
+    readline("Next [Enter]\t")
+    if (!is.na(fBase))
+        ggsave(paste("../img/gg", fBase, "Cond.pdf", sep = ""),
+               width = 6.62, height = 12.8)
+
+    # Saving 6.62 x 12.8 in image
+    return(NULL)
+}
+
+
+plotClusterExpression <- function(dat, clust)
+{
+    ggPlotExpression(dat[clust$rowIdx, clust$colIdx])
+}
+
+
+debug(condSizePlot)
+condSizePlot <- function(pssSols, dat, range = NULL, truth = NULL)
+{
+    if (is.null(range) || length(pssSols) != length(range))
+        stop("Range must be a non-null value of the lambda values used, 
+             the same length of pssSols")
+
+    sumDf <- ldply(pssSols, function(sol)
+                   {
+                       corDist <- cor(t(dat[sol$rowIdx, sol$colIdx]))
+                       corDist <- abs(corDist[upper.tri(corDist)])
+
+                       curAmrs <- NA
+
+                       if (!is.null(truth))
+                           curAmrs <- amrs.hp(truth, list(sol)) 
+
+
+                       return(c(mean(corDist), median(corDist), sd(corDist),
+                                    length(sol$rowIdx), length(sol$colIdx), 
+                                    curAmrs))
+                       # return (c(mean(corDist), median(corDist), sd(corDist), 
+                       #           length(sol$rowIdx), length(sol$colIdx)
+                       #           ))
+                   })
+
+    pairAmrs <- sapply(adjacentPairs(1, length(pssSols)), 
+                       function(x) amrs.hp(list(pssSols[[x[1]]]), list(pssSols[[x[2]]])))
+    pairAmrs <- c(NA, pairAmrs)
+    colV <- sapply(adjacentPairs(1, length(pssSols)), 
+                   function(x) vScore(pssSols[[x[1]]]$colIdx, pssSols[[x[2]]]$colIdx))
+    colV <- c(NA, colV)
+    rowV <- sapply(adjacentPairs(1, length(pssSols)), 
+                   function(x) vScore(pssSols[[x[1]]]$rowIdx, pssSols[[x[2]]]$rowIdx))
+    rowV <- c(NA, rowV)
+    vIdx <- c(NA, (range + 0.5)[1:(length(range))-1])
+
+
+    rownames(sumDf) <- range
+    sumDf <- cbind(range, sumDf, vIdx, pairAmrs, colV, rowV)
+    colnames(sumDf) <- c("lambda", "mean", "median", "sd", "nRows", "nCols", "amrs",
+                         "vIdx", "pairAmrs", "colV", "rowV")
+
+    meanPlot <- ggplot(sumDf, aes(x = lambda)) + 
+        geom_line(aes(y = mean, colour = "mean")) + 
+        geom_point(aes(y = mean, colour = "mean")) + 
+        geom_line(aes(y = amrs, colour = "amrs"), na.rm = T) + 
+        geom_point(aes(y = amrs, colour = "amrs"), na.rm = T) + 
+        geom_line(aes(y = sd, colour = "sd")) + 
+        geom_point(aes(y = sd, colour = "sd")) + 
+        # geom_line(aes(y = median, colour = "median")) + 
+        # geom_point(aes(y = median, colour = "median")) + 
+        geom_line(aes(x = vIdx, y = pairAmrs, colour = "pairAmrs"), na.rm = T) + 
+        geom_point(aes(x = vIdx, y = pairAmrs, colour = "pairAmrs"), na.rm = T) +
+        # geom_line(aes(x = vIdx, y = colV, colour = "colV"), na.rm = T) + 
+        # geom_point(aes(x = vIdx, y = colV, colour = "colV"), na.rm = T) +
+        # geom_line(aes(x = vIdx, y = rowV, colour = "rowV"), na.rm = T) + 
+        # geom_point(aes(x = vIdx, y = rowV, colour = "rowV"), na.rm = T) +
+        scale_y_continuous(limits = c(0, 1))
+
+    
+    rowPlot <- ggplot(sumDf, aes(lambda, nRows)) + 
+        geom_line(aes(colour = "nRows")) + geom_point(aes(colour = "nRows"))
+    colPlot <- ggplot(sumDf, aes(x = lambda, y = nCols)) + 
+        geom_line(aes(colour = "nCols")) + geom_point(aes(colour = "nCols")) +
+        geom_line(aes(y = lambda, colour = "lambda"))
+
+
+    amrsPlot <- NA
+    if (!is.null(truth))
+        amrsPlot <- ggplot(sumDf, aes(lambda, amrs)) + geom_line() + 
+            geom_point() + 
+            scale_y_continuous(limits = c(0,1))
+
+    return(list(summaryDf = sumDf, 
+                meanPlot = meanPlot,
+                rowPlot = rowPlot,
+                colPlot = colPlot,
+                amrsPlot = amrsPlot))
+}
+
+
+
+
+plotHeatmap <- function(data, clust, rows = T, cols = F)
+{
+    if (rows)
+        rows <- NULL
+    else
+        rows <- NA
+    if (cols)
+        cols <- NULL
+    else
+        cols <- NA
+
+    # heatmap(data[clust$rowIdx, clust$colIdx], Rowv = rows, Colv = cols, 
+    #         col = redgreen(256), keep.dendro = F, scale = "none")
+
+    # heatmap.2(data[clust$rowIdx, clust$colIdx], Rowv = rows, Colv = cols, 
+    #         col = redgreen(256), dendrogram = "both", scale = "none")
+    heatmap.2(data[clust$rowIdx, clust$colIdx], col = redgreen(256), trace = "none")
+}
+
+plotHeatmap2 <- function(data, rows = T, cols = F)
+{
+    if (rows)
+        rows <- NULL
+    else
+        rows <- NA
+    if (cols)
+        cols <- NULL
+    else
+        cols <- NA
+
+    heatmap(data, Rowv = rows, Colv = cols, col = redgreen(256))
+}
+
+
