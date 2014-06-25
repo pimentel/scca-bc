@@ -294,6 +294,8 @@ ggplot(corGG, aes(x = abs(Correlation), colour = Type)) + geom_freqpoly(aes(fill
 
 ggplot(tmpPca$abDat, aes(x = PC1, y = PC2, colour = cluster)) + geom_point()
 ggplot(tmpPca$abDat, aes(x = PC1, y = zeros, colour = cluster)) + geom_point()
+
+condSizePlot
 ggplot(tmpPca$abDat, aes(x = PC1, y = cov, colour = cluster)) + geom_point()
 ggplot(tmpPca$abDat, aes(x = median, y = cov, colour = cluster)) + geom_point()
 ggplot(tmpPca$abDat, aes(x = PC1, colour = cluster)) + geom_density()
@@ -468,34 +470,6 @@ load("../bcSol/fwReg.RData", verbose = T)
 ################################################################################
 load("../bcSol/bc30.fdr30p90Z.RData", verbose = T)
 
-plotHeatmap <- function(data, clust, rows = T, cols = F)
-{
-    if (rows)
-        rows <- NULL
-    else
-        rows <- NA
-    if (cols)
-        cols <- NULL
-    else
-        cols <- NA
-
-    heatmap(data[clust$rowIdx, clust$colIdx], Rowv = rows, Colv = cols, col = redgreen(256))
-}
-
-plotHeatmap2 <- function(data, rows = T, cols = F)
-{
-    if (rows)
-        rows <- NULL
-    else
-        rows <- NA
-    if (cols)
-        cols <- NULL
-    else
-        cols <- NA
-
-    heatmap(data, Rowv = rows, Colv = cols, col = redgreen(256))
-}
-
 gasPSS.50.2 <- postSubSample.median.kmeans2(bc30.fdr30p90Z)
 meow <- postSubSample.tight(bc30.fdr30p90Z, 0.5)
 
@@ -517,6 +491,43 @@ condOpt.29.33 <- optConditionSize(curMat, 29, 33)
 condOpt.29.33.Z <- optConditionSize(curMatZ, 29, 33)
 save(curMat, curMatZ, condOpt.29.33, condOpt.29.33.Z, 
      file = "condOpt.RData")
+
+condOpt.20.28.Z <- optConditionSize(curMatZ, 20, 28)
+condOpt.34.50.Z <- optConditionSize(curMatZ, 34, 50)
+save(curMat, curMatZ, condOpt.20.28.Z, condOpt.34.50.Z, 
+     condOpt.29.33, condOpt.29.33.Z, 
+     file = "condOpt.RData")
+
+
+## plots for looking at optimal cond size
+condOpt.20.50.Z <- unlist(list(condOpt.20.28.Z, condOpt.29.33.Z, condOpt.34.50.Z), recur
+condOpt.20.50.Z <- c(condOpt.20.28.Z$sol, condOpt.29.33.Z$sol, condOpt.34.50.Z$sol)
+
+pss.20.50.Z <- lapply(condOpt.20.50.Z, postSubSample.pca)
+pss.20.50.Z.clus <- lapply(pss.20.50.Z, function(x) x$cluster)
+
+cor50Mvn.truth <- list(list(rowIdx = 1:300, colIdx = 1:30))
+condInf <- condSizePlot(pss.20.50.Z.clus, curMat, 20:50, cor50Mvn.truth)
+condInf$meanPlot
+condInf$colPlot
+
+vScore(pss.20.50.Z.clus)
+
+
+sapply(adjacentPairs(1, length(pss.20.50.Z.clus)), function(x)
+       vScore(pss.20.50.Z.clus[[x[1]]]$colIdx, pss.20.50.Z.clus[[x[2]]]$colIdx)
+)
+
+tmp1 <- lapply(adjacentPairs(1, length(pss.20.50.Z.clus)), function(x)
+       amrs.hp(list(pss.20.50.Z.clus[[x[1]]]), list(pss.20.50.Z.clus[[x[2]]]))
+)
+
+
+tmp2 <- sapply(adjacentPairs(1, length(pss.20.50.Z.clus)), function(x)
+       amrs.hp(list(pss.20.50.Z.clus[[x[2]]]), list(pss.20.50.Z.clus[[x[1]]]))
+)
+
+
 
 ### Look at all diff solutions & investigate why cond vector is small
 load("~/Dropbox/biclustering/bcSol/condOpt.RData", verbose = T)

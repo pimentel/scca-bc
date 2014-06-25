@@ -264,11 +264,11 @@ maximizeOneSplit <- function(geneDf, lam, epsA = 0.1, epsB = 0.1, epsD = 0.1, ma
 #' @param geneDf data.frame with genes on rows and columns defining conditions
 #' @param nSamples integer denoting the number of permutations to perform
 #' @param lam regularization parameter for conditions (maximum number of conditions allows in a bicluster)
-biclusteringPar <- function(geneDf, nSamples = 100, lam, lam.lwr = 3.5)
+biclusteringPar <- function(geneDf, nSamples = 100, lam, lam.lwr = 3.5, clustOptions = list())
 {
     mclapply(1:nSamples, function(it) {
              cat("Biclustering iteration: ", it, "\n")
-             curSol <- maximizeOneSplit(geneDf, lam = lam, lam.lwr = lam.lwr)
+             curSol <- maximizeOneSplit(geneDf, lam = lam, lam.lwr = lam.lwr, clustOptions = clustOptions)
              return(curSol)
             })
 }
@@ -684,7 +684,7 @@ postSubSample.pca <- function(subSampleSol, abThresh = 0.6, dQuant = 0.5)
     pcaD$rotation[,"cluster"] <- "background"
     pcaD$rotation[colIdx,"cluster"] <- "bicluster"
 
-    return(list(abDat = pcaAB$rotation, dDat = pcaD, cluster = list(rowIdx = rowIdx, colIdx = colIdx)))
+    # return(list(abDat = pcaAB$rotation, dDat = pcaD, cluster = list(rowIdx = rowIdx, colIdx = colIdx)))
     return(list(rowIdx = rowIdx, colIdx = colIdx))
 }
 
@@ -774,6 +774,7 @@ postSubSample.tightPCA <- function(subSampleSol, abThresh = 0.6, dQuant = 0.5)
 # selected. Should also flatten out
 
 optConditionSize <- function(df, minLam, maxLam, cutoff = 0.6, 
+                             bcMethod = bcSubSamplePar, 
                              postProcess = postSubSample.pca, ...)
 {
     D <- as.data.frame(matrix(0, nrow = maxLam - minLam + 1, ncol = ncol(df)))
@@ -787,7 +788,7 @@ optConditionSize <- function(df, minLam, maxLam, cutoff = 0.6,
         # temporarily supress output
         sink("/dev/null")
         compTime <- system.time({
-            curSol <- bcSubSamplePar(df, lam = l, lam.lwr = max(l - 2, 5))
+            curSol <- bcMethod(df, lam = l, lam.lwr = 3)
             sols[[it]] <- curSol
             curClust <- postProcess(curSol, ...)
             D[it, curClust$colIdx] <- 1
