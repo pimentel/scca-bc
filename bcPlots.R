@@ -43,6 +43,7 @@ ggPlotParSolution <- function(parSol, clust = NA, fBase = NA, rowNames = NA,
               axis.title=element_text(size=15), 
               legend.text=element_text(size=14), 
               legend.title=element_text(size=14))
+    res <- list(featurePlot = p)
 
     print(p)
     readline("Next [Enter]\t")
@@ -68,8 +69,9 @@ ggPlotParSolution <- function(parSol, clust = NA, fBase = NA, rowNames = NA,
         ggsave(paste("../img/gg", fBase, "Cond.pdf", sep = ""),
                width = 6.62, height = 12.8)
 
+    res$condPlot <- p
     # Saving 6.62 x 12.8 in image
-    return(NULL)
+    return(res)
 }
 
 
@@ -79,7 +81,7 @@ plotClusterExpression <- function(dat, clust)
 }
 
 
-debug(condSizePlot)
+# debug(condSizePlot)
 condSizePlot <- function(pssSols, dat, range = NULL, truth = NULL)
 {
     if (is.null(range) || length(pssSols) != length(range))
@@ -197,3 +199,112 @@ plotHeatmap2 <- function(data, rows = T, cols = F)
 }
 
 
+corFigure <- function(sol, data,truth = FALSE)
+{
+    corClust <- cor(t(data[sol$rowIdx, sol$colIdx]))
+    corAll <- cbind(corClust[upper.tri(corClust)], "Bicluster")
+
+    ranRow <- sample.int(n = nrow(data), size = length(sol$rowIdx))
+    ranRowCor <- cor(t(data[ranRow, sol$colIdx]))
+    corAll <- rbind(corAll, cbind(ranRowCor[upper.tri(ranRowCor)], "Random rows"))
+
+
+    ranRow <- sample.int(n = nrow(data), size = length(sol$rowIdx))
+    ranCol <- sample.int(n = ncol(data), size = length(sol$colIdx))
+    bothRanCor <- cor(t(data[ranRow, ranCol]))
+    corAll <- rbind(corAll, cbind(bothRanCor[upper.tri(bothRanCor)], "Both random"))
+
+    allCond <- cor(t(data[sol$rowIdx,]))
+    corAll <- rbind(corAll, cbind(allCond[upper.tri(allCond)], "All conditions"))
+
+    if (truth)
+    {
+        corTruth <- cor(t(data[1:300, 1:30]))
+        corAll <- rbind(corAll, cbind(corTruth[upper.tri(corTruth)], "Truth"))
+    }
+
+    corAll <- as.data.frame(corAll, stringsAsFactors = F)
+    corAll[,1] <- as.numeric(corAll[,1])
+    colnames(corAll) <- c("Correlation", "Conditions")
+    
+    # ggplot(corAll, aes(x = Conditions, y = abs(Correlation), colour = Conditions)) + 
+    # ggplot(corAll, aes(x = Conditions, y = abs(Correlation), colour = Conditions)) + 
+    ggplot(corAll, aes(x = abs(Correlation), y = ..density.., colour = Conditions)) + 
+        # geom_density(aes(fill = Conditions), alpha = 0.5) + 
+        geom_histogram(aes(fill = Conditions), position = "dodge") + 
+        # geom_boxplot(aes(fill = Conditions), alpha = 0.5) + 
+        scale_fill_manual(values=cbbPalette) + 
+        scale_colour_manual(values=cbbPalette)
+}
+
+bcGeneNames <- function(data, sol = NULL)
+{
+    if (is.null(sol))
+        return(rownames(data))
+    rownames(data[sol$rowIdx,])
+}
+
+genePlot <- function(data, sol, genes, ordering = NULL)
+{
+    # sol$colIdx <- colnames(data)[sol$colIdx]
+    bg <- cbind(x = 1:ncol(data), melt(t(data[genes,])))
+    colnames(bg) <- c('x', 'condition', 'gene', 'value')
+    fg <- cbind(x = sol$colIdx, melt(t(data[genes, sol$colIdx])))
+    colnames(fg) <- c('x', 'condition', 'gene', 'value')
+    plt <- ggplot(bg, aes(x = x, y = value, color = gene)) + geom_line()
+    plt <- plt + geom_point(aes(x = x, y = value), data = fg,
+                            size = 3, shape = 21, fill = 'black') 
+    plt
+}
+
+ggPlotExpression <- function(exMat, cluster = NULL, clustRows = T, clustCols = T,
+                             rowNames = F, colNames = T)
+{
+    if (class(exMat) != 'matrix')
+    {
+        exMat <- as.matrix(exMat)
+        stopifnot(class(exMat) == 'matrix')
+    }
+    if (!is.null(cluster))
+        exMat <- exMat[cluster$rowIdx, cluster$colIdx]
+    rowOrder <- 1:nrow(exMat)
+    colOrder <- 1:ncol(exMat)
+    if (clustRows)
+        rowOrder <- orderByDendrogram(exMat)
+    if (clustCols)
+        colOrder <- orderByDendrogram(t(exMat))
+    exMat <- exMat[rowOrder, colOrder]
+    meltMat <- reshape2::melt(exMat, varnames = c("x", "y"))
+    breaksM <- round(seq(min(meltMat$value, na.rm = T), max(meltMat$value, na.rm = T), 
+                         length.out = 10), 3)
+    print(rownames(exMat))
+    if (is.null(colnames(exMat)))
+        colnames(exMat) <- 1:ncol(exMat)
+    meltMat$y <- factor(meltMat$y, levels = colnames(exMat))
+    p <- ggplot(meltMat, aes(x, y, fill = value))
+    p <- p + geom_tile() + scale_fill_gradientn(colours = redgreen(20),
+                                                guide = guide_legend(title = "Expression", 
+                                                                     reverse = T, size = 14)) 
+    p <- p + xlab("Gene") + ylab("Condition") + theme_bw() + theme(legend.text = element_text(size = 14),
+                                                                   legend.title = element_text(size = 14),
+                                                                   axis.title=element_text(size=15))
+    if (rowNames)
+        p <- p + theme(axis.text.x=element_text(angle = 90, size=14))
+    else
+        p <- p + theme(axis.text.x=element_text(size=0))
+
+    if (colNames)
+        p <- p + theme(axis.text.y=element_text(size=14))
+    else
+        p <- p + theme(axis.text.y=element_text(size=0))
+
+
+    list(plot = p, rowOrder = rowOrder, colOrder = colOrder)
+}
+
+orderByDendrogram <- function(mat)
+{
+    hc <- hclust(dist(mat))
+    dc <- as.dendrogram(hc)
+    order.dendrogram(dc)
+}

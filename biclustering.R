@@ -274,6 +274,30 @@ biclusteringPar <- function(geneDf, nSamples = 100, lam, lam.lwr = 3.5, clustOpt
 }
 
 
+bcSubSampleSerial <- function(geneDf, nSamples = 100, lam, propSample = 0.6, lam.lwr = 3.5,
+                           clustOptions = list())
+{
+    if (propSample > 1 | propSample < 0.01)
+        stop("Invalid range for propSample")
+
+    nRowsSample <- round(propSample * nrow(geneDf) )
+    if (nRowsSample %% 2)
+        nRowsSample <- nRowsSample + 1
+
+    cat("Sampling ", nRowsSample, " features\n")
+    lapply(1:nSamples, function(it) {
+           cat("**Biclustering iteration: ", it, "\n")
+           sampIdx <- sample.int(nrow(geneDf), size = nRowsSample)
+           abSol <- rep.int(NA, nrow(geneDf))
+           curSol <- maximizeOneSplit(geneDf[sampIdx,], lam, lam.lwr = lam.lwr, 
+                                      clustOptions = clustOptions)
+           abSol[sampIdx] <- curSol$ab
+           d <- curSol$d
+           return(list(ab = abSol, d = d, sccaLam = curSol$sccaLam))
+                           })
+}
+
+
 bcSubSamplePar <- function(geneDf, nSamples = 100, lam, propSample = 0.6, lam.lwr = 3.5,
                            clustOptions = list())
 {
@@ -309,18 +333,54 @@ postSubSample.pca <- function(subSampleSol, abThresh = 0.6, dQuant = 0.5)
 
     bootStrapNAs <- function(dat, lwr, upr)
     {
-        for (col in 1:ncol(dat))
+        for (icol in 1:ncol(dat))
         {
-            rng <- quantile(dat[,col], probs = c(lwr, upr), na.rm = T)
-            whichValid <- which(rng[1] <= dat[,col] & dat[,col] <= rng[2])
-            nNa <- sum(is.na(dat[,col]))
-            dat[is.na(dat[,col]), col] <- dat[sample(whichValid, nNa, replace = T), col]
+            rng <- quantile(dat[,icol], probs = c(lwr, upr), na.rm = T)
+            # FIXME: why is this not matching at least some things?
+            whichValid <- which( (rng[1] <= dat[,icol]) & (dat[,icol] <= rng[2]))
+            nNa <- sum(is.na(dat[,icol]))
+            if (length(whichValid) == 0)
+            {
+                # cat("len == 0", icol, "\n")
+                # print(sum(!is.na(dat[,icol])))
+                whichValid <- which(!is.na(dat[,icol]))
+                # print(whichValid)
+                # print("----")
+            }
+            samps <- NA
+            if (length(whichValid) == 1)
+                samps <- rep.int(whichValid, nNa)
+            else
+                samps <- sample(whichValid, nNa, replace = T)
+                
+            dat[is.na(dat[,icol]), icol] <- dat[samps,icol]
+            # if (any(is.na(dat[,icol])))
+            # {
+            #     cat("samples:", icol, "\n")
+            #     print(dat[samps,icol])
+            #     print("whichValid values:")
+            #     print(dat[whichValid,icol])
+            #     print("whichValid:")
+            #     print(length(whichValid))
+            #     print(whichValid)
+            # }
         }
 
         return(dat)
     }
 
     ab <- bootStrapNAs(ab, 0.05, 0.95)
+    # print(sum(is.infinite(ab)))
+    # print(sum(is.na(ab)))
+
+    # a_ply(ab, 2, function(x) 
+    #       {
+    #           if(any(is.na(x))) print(x)
+    #       }
+    # )
+
+    # print(summary(ab))
+    # print(summary(t(ab)))
 
     pcaAB <- prcomp(ab, center = F, scale. = F)
     pcaAB$rotation <- as.data.frame(data.matrix(as.data.frame(pcaAB$rotation, stringsAsFactors = F)))
@@ -373,6 +433,7 @@ postSubSample.pca <- function(subSampleSol, abThresh = 0.6, dQuant = 0.5)
 # (should increase to a flat region) and also look at the number of conditions
 # selected. Should also flatten out
 
+# TODO: instead of minLam and maxLam take a vector of lams
 optConditionSize <- function(df, minLam, maxLam, cutoff = 0.6, 
                              bcMethod = bcSubSamplePar, 
                              postProcess = postSubSample.pca, ...)
@@ -386,15 +447,18 @@ optConditionSize <- function(df, minLam, maxLam, cutoff = 0.6,
         cat("Doing optimization for lambda = ", l, "\n")
 
         # temporarily supress output
-        sink("/dev/null")
+        # sink("/dev/null")
         compTime <- system.time({
             curSol <- bcMethod(df, lam = l, lam.lwr = 3)
             sols[[it]] <- curSol
-            curClust <- postProcess(curSol, ...)
-            D[it, curClust$colIdx] <- 1
+            if (!is.null(postProcess))
+            {
+                curClust <- postProcess(curSol, ...)
+                D[it, curClust$colIdx] <- 1
+            }
             it <- it + 1
         })
-        sink()
+        # sink()
         print(compTime)
         cat(length(curClust$colIdx), "\n")
     }

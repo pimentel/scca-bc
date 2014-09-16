@@ -117,7 +117,7 @@ ggPlotExpression(flyWorm[pss.fwBC30$rowIdx, sort(c(pss.fwBC30$colIdx))])
 
 # TODO: fix this figure
 # Fly/worm Fig. to show Prof. Huang
-ggPlotExpression(flyWorm[pss.fwBC30$rowIdx, sort(c(pss.fwBC30$colIdx))])
+ggPlotExpression(flyWorm[pss.fwBC30$rowIdx, sort(c(pss.fwBC30$colIdx))], clustCols = F)
 ggsave("../img/flyWorm_90_90.pdf", width = 21.6, height = 9.91 )
 # Saving 21.6 x 9.91 in image
  

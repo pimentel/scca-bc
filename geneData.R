@@ -630,4 +630,16 @@ ggPlotExpression(datTmp[pssTmp$rowIdx, pssTmp$colIdx])
 ggPlotParSolution(bc15nAE)
 
 
+################################################################################
+# use optCondSize
+################################################################################
+
+fdr30p90 <- list()
+fdr30p90$data <- gasMatNz[fdr30p90.idx,]
+fdr30p90$dataZ <- t(scale(t( fdr30p90$data )))
+save(fdr30p90, file = "fdr30p90.RData")
+
+load("../data/fdr30p90.RData", verbose = T)
+fdr30p90$bc <- optConditionSize(fdr30p90$dataZ, minLam = 12, maxLam = 35, 
+                                bcMethod = bcSubSamplePar, NULL)
 

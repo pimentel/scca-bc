@@ -296,25 +296,6 @@ print(levelplot(t(A),
                 } ) )
 
 
-ggPlotExpression <- function(exMat)
-{
-    meltMat <- melt(exMat, varnames = c("x", "y"))
-    breaksM <- round(seq(min(meltMat$value, na.rm = T), max(meltMat$value, na.rm = T), 
-                         length.out = 10), 3)
-    meltMat$y <- factor(meltMat$y, levels = colnames(exMat))
-    # idx <- reorder(meltMat$y, colnames(exMat))
-    p <- ggplot(meltMat, aes(x, y, fill = value))
-    #p <- p + geom_tile() + scale_fill_gradientn(colours = cm.colors(20),
-    p <- p + geom_tile() + scale_fill_gradientn(colours = redgreen(20),
-                                                guide = guide_legend(title = "Expression", reverse = T, size = 14)) 
-    p <- p + xlab("Gene") + ylab("Condition") + theme_bw() + theme(legend.text = element_text(size = 14),
-                                                                   legend.title = element_text(size = 14),
-                                                                   # axis.text.x=element_text(size=14),
-                                                                   axis.text.x=element_text(size=0),
-                                                                   axis.text.y=element_text(size=14), 
-                                                                   axis.title=element_text(size=15))
-    print(p)
-}
 
 debug(ggPlotExpression)
 

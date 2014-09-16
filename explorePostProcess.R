@@ -39,45 +39,6 @@ dev.print(pdf, "~/Dropbox/biclustering/ismb/extAbstract/hist.pdf")
 ct <- cor(t(mat[1:300, 1:30]))
 plot(density(ct[upper.tri(ct)]))
 
-corFigure <- function(data, sol, truth = FALSE)
-{
-    corClust <- cor(t(data[sol$rowIdx, sol$colIdx]))
-    corAll <- cbind(corClust[upper.tri(corClust)], "Bicluster")
-
-    ranRow <- sample.int(n = nrow(data), size = length(sol$rowIdx))
-    ranRowCor <- cor(t(data[ranRow, sol$colIdx]))
-    corAll <- rbind(corAll, cbind(ranRowCor[upper.tri(ranRowCor)], "Random rows"))
-
-
-    ranRow <- sample.int(n = nrow(data), size = length(sol$rowIdx))
-    ranCol <- sample.int(n = ncol(data), size = length(sol$colIdx))
-    bothRanCor <- cor(t(data[ranRow, ranCol]))
-    corAll <- rbind(corAll, cbind(bothRanCor[upper.tri(bothRanCor)], "Both random"))
-
-    allCond <- cor(t(data[sol$rowIdx,]))
-    corAll <- rbind(corAll, cbind(allCond[upper.tri(allCond)], "All conditions"))
-
-    if (truth)
-    {
-        corTruth <- cor(t(data[1:300, 1:30]))
-        corAll <- rbind(corAll, cbind(corTruth[upper.tri(corTruth)], "Truth"))
-    }
-
-    corAll <- as.data.frame(corAll, stringsAsFactors = F)
-    corAll[,1] <- as.numeric(corAll[,1])
-    colnames(corAll) <- c("Correlation", "Conditions")
-    
-    # ggplot(corAll, aes(x = Conditions, y = abs(Correlation), colour = Conditions)) + 
-    # ggplot(corAll, aes(x = Conditions, y = abs(Correlation), colour = Conditions)) + 
-    ggplot(corAll, aes(x = abs(Correlation), y = ..density.., colour = Conditions)) + 
-        # geom_density(aes(fill = Conditions), alpha = 0.5) + 
-        geom_histogram(aes(fill = Conditions), position = "dodge") + 
-        # geom_boxplot(aes(fill = Conditions), alpha = 0.5) + 
-        scale_fill_manual(values=cbbPalette) + 
-        scale_colour_manual(values=cbbPalette)
-}
-
-
 
 
 sol.50 <- postSubSample.median(curSol)
