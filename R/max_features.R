@@ -14,6 +14,5 @@ features_max_fscca <- function(X, Y, d, lam_a, lam_b)
 
     res <- fscca(xTilde, yTilde, "lasso", "lasso", lam_a, lam_b)
 
-
-    return(list(a = res$A, b = res$B))
+    return(list(a = res$A[,1], b = res$B[,1]))
 }

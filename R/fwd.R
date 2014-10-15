@@ -1,3 +1,3 @@
-#' @useDynLib fscca
+#' @useDynLib sccab
 #' @importFrom Rcpp evalCpp
 NULL
