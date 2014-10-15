@@ -8,9 +8,10 @@ This method finds linear biclusters by exploiting SCCA.
 
 ## Major refactoring
 - Start using `fscca` instead of `scca`
-- Move to `roxygen`
 - Formal class instead of just passing
 - Post processes more formal
+- ~~Move to `roxygen`~~
+- ~~Turn into a real R package~~
 
 ## Minor
 - camelCase to snake_case
