@@ -1,11 +1,14 @@
-Package: anRpackage
+Package: bs
 Type: Package
-Title: What the package does (short line)
-Version: 1.0
+Title: Biclustering by SCCA
+Version: 0.1.0
 Date: 2014-10-14
-Author: Your Name
-Maintainer: Your Name <your@email.com>
-Description: More about what it does (maybe more than one line)
-License: GPL (>= 2)
-Imports: Rcpp (>= 0.11.3)
+Author: Harold Pimentel
+Maintainer: Harold Pimentel <haroldpimentel@gmail.com>
+Description: Biclustering by Sparse Canonical Correlation Analysis.
+License: MIT + file LICENSE
+Imports:
+    Rcpp (>= 0.11.3)
 LinkingTo: Rcpp
+Suggests:
+    testthat
