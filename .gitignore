@@ -1,6 +1,7 @@
 # Random files
 *.txt
 *.pdf
+*.DS_Store
 
 # R specific
 .Rapp.history

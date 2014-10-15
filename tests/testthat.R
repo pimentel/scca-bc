@@ -1,4 +1,4 @@
 library(testthat)
-library(anRpackage)
+library(sccab)
 
-test_check("anRpackage")
+test_check("sccab")
