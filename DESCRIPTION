@@ -1,4 +1,4 @@
-Package: bs
+Package: sccab
 Type: Package
 Title: Biclustering by SCCA
 Version: 0.1.0
