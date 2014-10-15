@@ -1,5 +1,10 @@
-*.RData
+# Random files
 *.txt
 *.pdf
 
+# R specific
 .Rapp.history
+
+# C++
+*.o
+*.so
