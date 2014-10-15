@@ -2,7 +2,12 @@
 
 export(.lasso_max_d)
 export(bcSubSamplePar)
+export(bcSubSampleSerial)
 export(biClustMax.optim)
 export(biclusteringPar)
+export(ggPlotExpression)
+export(ggPlotSSSolution)
+export(orderByDendrogram)
+export(plotClusterExpression)
 importFrom(Rcpp,evalCpp)
 useDynLib(sccab)

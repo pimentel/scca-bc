@@ -23,111 +23,49 @@ splitEvenly <- function(n)
 #' @param lam maximum cluster size
 #' @return A list containing maximum values of a, b, d
 #' @export
-biClustMax.optim <- function(xDf, yDf, d.start, a, b, lam, verbose = TRUE, optim.max = 4, lam.lwr = 3.5,
+biClustMax.optim <- function(X, Y, d.start, a, b, lam, verbose = TRUE, optim.max = 4, lam.lwr = 3.5,
                              clustOptions = list())
 {
 
     # iterate until we've hit maximum iterations or QP has converged
-    if (verbose)
-        cat("Computing tilde matrices\n")
-    xTilde <- t(xDf %*% diag(d.start))
-    yTilde <- t(yDf %*% diag(d.start))
 
-    if (verbose)
-        cat("Computing SCCA component\n")
 
-    # First maximize a and b using SCCA
-    pen <- "LASSO"
-    if (!is.null(clustOptions$penalty))
-        pen <- clustOptions$penalty
+    # # First maximize a and b using SCCA
+    # pen <- "LASSO"
+    # if (!is.null(clustOptions$penalty))
+    #     pen <- clustOptions$penalty
 
     lamx <- c(1,2,3)
     if (!is.null(clustOptions$lamx))
         lamx <- clustOptions$lamx
-    cv <- "CV.alt"
-    if (!is.null(clustOptions$cv))
-        cv <- clustOptions$cv
+
+    # cv <- "CV.alt"
+    # if (!is.null(clustOptions$cv))
+    #     cv <- clustOptions$cv
+
+    # if (verbose)
+    #     cat("Using penalty: ", pen, "\n")
+
+    # sccaRes <- scca(as.matrix(xTilde), as.matrix(yTilde), 
+    #                 nc = 1, 
+    #                 penalty = pen,
+    #                 lamx = lamx,
+    #                 lamy = lamx,
+    #                 tuning = cv,
+    #                 center = TRUE, scale = TRUE)
+    # a <- as.numeric(sccaRes$A)
+    # b <- as.numeric(sccaRes$B)
 
     if (verbose)
-        cat("Using penalty: ", pen, "\n")
+        cat("Computing SCCA component\n")
+    res <- features_max_fscca(X, Y, d.start, lamx, lamx)
+    a <- res$a
+    b <- res$b
 
-    sccaRes <- scca(as.matrix(xTilde), as.matrix(yTilde), 
-                    nc = 1, 
-                    penalty = pen,
-                    lamx = lamx,
-                    lamy = lamx,
-                    tuning = cv,
-                    center = TRUE, scale = TRUE)
-    a <- as.numeric(sccaRes$A)
-    b <- as.numeric(sccaRes$B)
+    d_optim <- lasso_max_d(X, Y, res$a, res$b, lam)
 
-    # XXX: Possibly remove... Unsure if I should scale in this fashion
-    xDf <- scale(xDf)
-    yDf <- scale(yDf)
 
-    # Now, maximize D using quadratic programming
-    # q <- - 2 * as.numeric((a %*% xDf) * (b %*% yDf))
-    q <- -as.numeric((a %*% xDf) * (b %*% yDf))
-
-    if (verbose)
-        cat("Solving optimization of d\n")
-
-    # lower bound is zero
-    constrMat<- diag(length(q))
-    # upper bound is one
-    constrMat <- rbind(constrMat, -diag(length(q)))
-    # regularize (sum(d) <= lam)
-    constrMat <- rbind(constrMat, rep.int(-1, length(q)))
-    constrLimit <- c(rep(0, length(q)), 
-                     rep(-1, length(q)),
-                     -lam)
-
-    # FIXME: temporary until I figure out what is wrong with this function...
-    # regularize (sum(d) >= lam.lwr)
-    # constrMat <- rbind(constrMat, rep.int(1, length(q)))
-    # constrLimit <- c(rep(0, length(q)), 
-    #                  rep(-1, length(q)),
-    #                  -lam, lam.lwr)
-
-    objectiveFn <- function(d, qVec)
-    {
-        # sum(0.5 * d^2 * qVec)
-        sum(d^2 * qVec)
-    }
-
-    optimIt <- 0
-    repeat {
-        optimRes <- constrOptim(d.start, objectiveFn, grad = NULL,
-                                control = list(maxit = as.integer(1000000000)),
-                                # control = list(maxit = 10000),
-                                ui = constrMat, ci = constrLimit,
-                                qVec = q
-                                )
-
-        if (optimRes$convergence != 0)
-        {
-            warning("Error with convergence.\n", "\tError code: ", 
-                    optimRes$convergence, "\tMessage: ", optimRes$message,
-                    immediate. = TRUE)
-            if (optimIt >= optim.max)
-            {
-                warning("*****Reached maximum number of iterations of constrOptim. Exiting",
-                        immediate. = TRUE)
-                break
-            }
-            optimIt <- optimIt + 1
-            d.start <- optimRes$par
-            cat("\t\tRestarting optimization at new point.\n")
-            cat("\t\tconstrOptim iteration: ", optimIt + 1, "\n")
-        }
-        else
-        {
-            break
-        }
-
-    }
-
-    return(list(a = a, b = b, d = optimRes$par, q, sccaLam = sccaRes$lambda))
+    return(list(a = a, b = b, d = d_optim, q, sccaLam = res$lambda))
 }
 
 
@@ -241,20 +179,28 @@ maximizeOneSplit <- function(geneDf, lam, epsA = 0.1, epsB = 0.1, epsD = 0.1, ma
 #' parallel using library "multicore." To set the number of cores used, set
 #' options(cores = N).
 #'
-#' @param geneDf data.frame with genes on rows and columns defining conditions
+#' @param expression matrix with features on rows and conditions on columns
 #' @param nSamples integer denoting the number of permutations to perform
 #' @param lam regularization parameter for conditions (maximum number of conditions allows in a bicluster)
 #' @export
-biclusteringPar <- function(geneDf, nSamples = 100, lam, lam.lwr = 3.5, clustOptions = list())
+biclusteringPar <- function(expression, nSamples = 100, lam, lam.lwr = 3.5, clustOptions = list())
 {
     mclapply(1:nSamples, function(it) {
              cat("Biclustering iteration: ", it, "\n")
-             curSol <- maximizeOneSplit(geneDf, lam = lam, lam.lwr = lam.lwr, clustOptions = clustOptions)
+             curSol <- maximizeOneSplit(expression, lam = lam, lam.lwr = lam.lwr, clustOptions = clustOptions)
              return(curSol)
             })
 }
 
 
+#' Serial biclustering
+#'
+#' Uses one core to perform SCCAB
+#'
+#' @param expression matrix with features on rows and conditions on columns
+#' @param nSamples integer denoting the number of permutations to perform
+#' @param lam regularization parameter for conditions (maximum number of conditions allows in a bicluster)
+#' @export
 bcSubSampleSerial <- function(geneDf, nSamples = 100, lam, propSample = 0.6, lam.lwr = 3.5,
                            clustOptions = list())
 {

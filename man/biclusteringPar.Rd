@@ -5,11 +5,11 @@
 parallel using library "multicore." To set the number of cores used, set
 options(cores = N).}
 \usage{
-biclusteringPar(geneDf, nSamples = 100, lam, lam.lwr = 3.5,
+biclusteringPar(expression, nSamples = 100, lam, lam.lwr = 3.5,
   clustOptions = list())
 }
 \arguments{
-\item{geneDf}{data.frame with genes on rows and columns defining conditions}
+\item{expression}{matrix with features on rows and conditions on columns}
 
 \item{nSamples}{integer denoting the number of permutations to perform}
 

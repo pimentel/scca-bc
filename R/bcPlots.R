@@ -1,4 +1,16 @@
-ggPlotParSolution <- function(parSol, clust = NA, fBase = NA, rowNames = NA,
+#' Plot the parallel solution
+#'
+#' Plot a solution from either bcSubSampleSerial or bcSubSamplePar
+#'
+#' @param parSol the solution
+#' @param clust if you've post-process clustered the clustered object denoting
+#' which rows/columns exist in the bicluster
+#' @param fBase a string for the file name
+#' @param rowNames if not NA, the rownames to use for expression features
+#' @param colNames if not NA, a character vector of column (condition) names
+#' @return A list with two ggplot objects
+#' @export
+ggPlotSSSolution <- function(parSol, clust = NA, fBase = NA, rowNames = NA,
                               colNames = NA)
 {
     par(ask = FALSE)
@@ -73,10 +85,6 @@ ggPlotParSolution <- function(parSol, clust = NA, fBase = NA, rowNames = NA,
 }
 
 
-plotClusterExpression <- function(dat, clust)
-{
-    ggPlotExpression(dat[clust$rowIdx, clust$colIdx])
-}
 
 
 condSizePlot <- function(pssSols, dat, range = NULL, truth = NULL)
@@ -196,7 +204,7 @@ plotHeatmap2 <- function(data, rows = T, cols = F)
 }
 
 
-corFigure <- function(sol, data,truth = FALSE)
+corFigure <- function(sol, data, truth = FALSE)
 {
     corClust <- cor(t(data[sol$rowIdx, sol$colIdx]))
     corAll <- cbind(corClust[upper.tri(corClust)], "Bicluster")
@@ -254,6 +262,34 @@ genePlot <- function(data, sol, genes, ordering = NULL)
     plt
 }
 
+#' Plot the expression only in the bicluster
+#'
+#' Given some solution from a post-process method, plot only those rows and
+#' columns
+#'
+#' @param exMat the expression matrix
+#' @param clust the post-process clustering output
+#' @return a gpplot object
+#' @export
+plotClusterExpression <- function(exMat, clust)
+{
+    ggPlotExpression(dat[clust$rowIdx, clust$colIdx])
+}
+
+#' Heatmap of expression
+#'
+#' Plot all of the points in an expression matrix
+#'
+#' @param exMat the expression matrix
+#' @param cluster either the cluster results to group the rows/columns in the
+#' biclustering, or NULL if there are no results
+
+#' @param clustRows if TRUE, cluster the rows by hierarchical clustering.
+#' @param clustCols if TRUE, cluster the columns by hierarchical clustering.
+#' @param rowNames if TRUE, print the row names on the plot
+#' @param colNames if TRUE, print the column names on the plot
+#' @return a ggplot object
+#' @export
 ggPlotExpression <- function(exMat, cluster = NULL, clustRows = T, clustCols = T,
                              rowNames = F, colNames = T)
 {
@@ -299,6 +335,11 @@ ggPlotExpression <- function(exMat, cluster = NULL, clustRows = T, clustCols = T
     list(plot = p, rowOrder = rowOrder, colOrder = colOrder)
 }
 
+#' Order by dendrogram
+#'
+#' @param mat a matrix where the rows are observations and the columns are different dimensions on the matrix
+#' @return a vector of label orderings
+#' @export
 orderByDendrogram <- function(mat)
 {
     hc <- hclust(dist(mat))

@@ -1,6 +1,10 @@
 lasso_max_d <- function(X, Y, a, b, s)
 {
-    # TODO: Write me!
+    Xs <- scale(X)
+    Ys <- scale(Y)
+    q <- (a %*% Xs) * (b %*% Ys)
+
+    .lasso_max_d(q, s)
 }
 
 #' Maximize the d vector in biclustering
@@ -43,4 +47,76 @@ lasso_max_d <- function(X, Y, a, b, s)
     }
 
     d
+}
+
+old_lasso_max_d <- function(X, Y, a, b, s)
+{
+    # XXX: Possibly remove... Unsure if I should scale in this fashion
+    xDf <- scale(X)
+    yDf <- scale(Y)
+
+    # Now, maximize D using quadratic programming
+    # q <- - 2 * as.numeric((a %*% xDf) * (b %*% yDf))
+    q <- -as.numeric((a %*% xDf) * (b %*% yDf))
+
+    if (verbose)
+        cat("Solving optimization of d\n")
+
+    # lower bound is zero
+    constrMat<- diag(length(q))
+    # upper bound is one
+    constrMat <- rbind(constrMat, -diag(length(q)))
+    # regularize (sum(d) <= lam)
+    constrMat <- rbind(constrMat, rep.int(-1, length(q)))
+    constrLimit <- c(rep(0, length(q)), 
+                     rep(-1, length(q)),
+                     -lam)
+
+    # FIXME: temporary until I figure out what is wrong with this function...
+    # regularize (sum(d) >= lam.lwr)
+    # constrMat <- rbind(constrMat, rep.int(1, length(q)))
+    # constrLimit <- c(rep(0, length(q)), 
+    #                  rep(-1, length(q)),
+    #                  -lam, lam.lwr)
+
+    objectiveFn <- function(d, qVec)
+    {
+        # sum(0.5 * d^2 * qVec)
+        sum(d^2 * qVec)
+    }
+
+    optimIt <- 0
+    repeat {
+        optimRes <- constrOptim(d.start, objectiveFn, grad = NULL,
+                                control = list(maxit = as.integer(1000000000)),
+                                # control = list(maxit = 10000),
+                                ui = constrMat, ci = constrLimit,
+                                qVec = q
+                                )
+
+        if (optimRes$convergence != 0)
+        {
+            warning("Error with convergence.\n", "\tError code: ", 
+                    optimRes$convergence, "\tMessage: ", optimRes$message,
+                    immediate. = TRUE)
+            if (optimIt >= optim.max)
+            {
+                warning("*****Reached maximum number of iterations of constrOptim. Exiting",
+                        immediate. = TRUE)
+                break
+            }
+            optimIt <- optimIt + 1
+            d.start <- optimRes$par
+            cat("\t\tRestarting optimization at new point.\n")
+            cat("\t\tconstrOptim iteration: ", optimIt + 1, "\n")
+        }
+        else
+        {
+            break
+        }
+
+    }
+
+    
+    return(optimRes$par)
 }

@@ -4,19 +4,19 @@
 \title{One iteration of biclustering maximization. Takes the current values of
 d, a, b and if successful returns one iteration}
 \usage{
-biClustMax.optim(xDf, yDf, d.start, a, b, lam, verbose = TRUE,
-  optim.max = 4, lam.lwr = 3.5, clustOptions = list())
+biClustMax.optim(X, Y, d.start, a, b, lam, verbose = TRUE, optim.max = 4,
+  lam.lwr = 3.5, clustOptions = list())
 }
 \arguments{
-\item{xDf}{matrix with rows representing genes and columns representing conditions (n x k)}
-
-\item{yDf}{matrix with rows representing genes and columns representing conditions (n x k)}
-
 \item{a}{vector of dimension n}
 
 \item{b}{vector of dimension n}
 
 \item{lam}{maximum cluster size}
+
+\item{xDf}{matrix with rows representing genes and columns representing conditions (n x k)}
+
+\item{yDf}{matrix with rows representing genes and columns representing conditions (n x k)}
 
 \item{d}{vector of dimension k}
 }
