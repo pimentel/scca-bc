@@ -23,25 +23,17 @@ splitEvenly <- function(n)
 #' @param lam maximum cluster size
 #' @return A list containing maximum values of a, b, d
 #' @export
-biClustMax.optim <- function(X, Y, d.start, a, b, lam, verbose = TRUE, optim.max = 4, lam.lwr = 3.5,
-                             clustOptions = list())
+biClustMax.optim <- function(X, Y, d.start, a, b, lam, verbose = TRUE,
+    optim.max = 4, lam.lwr = 3.5, clustOptions = list())
 {
 
-    # iterate until we've hit maximum iterations or QP has converged
-
-
-    # # First maximize a and b using SCCA
     # pen <- "LASSO"
     # if (!is.null(clustOptions$penalty))
     #     pen <- clustOptions$penalty
 
-    lamx <- c(1,2,3)
+    lamx <- 1:3
     if (!is.null(clustOptions$lamx))
         lamx <- clustOptions$lamx
-
-    # cv <- "CV.alt"
-    # if (!is.null(clustOptions$cv))
-    #     cv <- clustOptions$cv
 
     # if (verbose)
     #     cat("Using penalty: ", pen, "\n")
@@ -58,6 +50,8 @@ biClustMax.optim <- function(X, Y, d.start, a, b, lam, verbose = TRUE, optim.max
 
     if (verbose)
         cat("Computing SCCA component\n")
+
+    # First maximize a and b using SCCA
     res <- features_max_fscca(X, Y, d.start, lamx, lamx)
     a <- res$a
     b <- res$b

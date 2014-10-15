@@ -19,3 +19,19 @@ test_that("Regularization",
 # .lasso_max_d(c(1, 30, 30, 30, 30), 0.7)
 # .lasso_max_d(c(NA, 30, 30, 30, 30), 0.7)
 
+context("Maximizing feature coefficients (SCCA)")
+
+test_that("Correct dimension",
+    {
+        n <- 300
+        k <- 30
+        X <- matrix(rnorm(n * k), ncol = k)
+        Y <- matrix(rnorm(n * k), ncol = k)
+        d <- runif(k)
+        lam <- 1:3
+
+        capture.output(res <- features_max_fscca(X, Y, d, lam, lam))
+
+        expect_equal(length(res$a), n)
+        expect_equal(length(res$b), n)
+    })

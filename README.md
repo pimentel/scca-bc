@@ -12,9 +12,9 @@ This method finds linear biclusters by exploiting SCCA.
 - Investigate how to scale differently for **D**
 
 ## Major refactoring
-- Start using `fscca` instead of `scca`
-- Formal class instead of just passing
+- Formal results class instead of passing around an ugly list
 - Post processes more formal
+- ~~Start using `fscca` instead of `scca`~~
 - ~~Move to `roxygen`~~
 - ~~Turn into a real R package~~
 
