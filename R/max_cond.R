@@ -11,7 +11,8 @@ lasso_max_d <- function(X, Y, a, b, s)
 #'
 #' @param q a vector of length k, where k is the number of conditions
 #' @param s a regularization parameter such that s > 0 and t(d) *%* q %* d  <= s
-#' @return a valid maximum  
+#' @return a valid maximum
+#' @export
 .lasso_max_d <- function(q, s)
 {
     # XXX: Not checking if s > 0... a program above should check
