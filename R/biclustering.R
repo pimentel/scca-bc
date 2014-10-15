@@ -1,49 +1,28 @@
-# Author: Harold Pimentel
-# Contact: pimentel@cs.berkeley.edu
-
-# Lee et. al. package. Provides 'scca()'
-library(scca)
-library(MASS)
-library(Matrix)
-library(parallel)
-
-debug(biClustMax.optim)
-undebug(biClustMax.optim)
-
-debug(NIPALS.sparse)
-undebug(NIPALS.sparse)
-
-debug(opt.cv.alt)
-undebug(opt.cv.alt)
-
-debug(scca)
-undebug(scca)
-
-##' Randomly splits indices if there are an even number
-##' 
-##' @param n the number of indices
-##' @returns a list with two disjoint sets of indices from 1 to n.
+#' Randomly splits indices if there are an even number
+#' 
+#' @param n the number of indices
+#' @return a list with two disjoint sets of indices from 1 to n.
 splitEvenly <- function(n)
 {
     if ( n %% 2 != 0)
     {
-        stop("Not an even number of genes!")
+        stop("Not an even number of samples!")
     }
     sets <- split(sample.int(n), 1:2)
     return(sets)
 }
 
-##' One iteration of biclustering maximization. Takes the current values of 
-##' d, a, b and if successful returns one iteration
-##' 
-##' @param xDf matrix with rows representing genes and columns representing conditions (n x k)
-##' @param yDf matrix with rows representing genes and columns representing conditions (n x k)
-##' @param d vector of dimension k
-##' @param a vector of dimension n
-##' @param b vector of dimension n
-##' @param lam maximum cluster size
-##' @return A list containing maximum values of a, b, d
-# uses constrOptim
+#' One iteration of biclustering maximization. Takes the current values of 
+#' d, a, b and if successful returns one iteration
+#' 
+#' @param xDf matrix with rows representing genes and columns representing conditions (n x k)
+#' @param yDf matrix with rows representing genes and columns representing conditions (n x k)
+#' @param d vector of dimension k
+#' @param a vector of dimension n
+#' @param b vector of dimension n
+#' @param lam maximum cluster size
+#' @return A list containing maximum values of a, b, d
+#' @export
 biClustMax.optim <- function(xDf, yDf, d.start, a, b, lam, verbose = TRUE, optim.max = 4, lam.lwr = 3.5,
                              clustOptions = list())
 {
@@ -261,9 +240,11 @@ maximizeOneSplit <- function(geneDf, lam, epsA = 0.1, epsB = 0.1, epsD = 0.1, ma
 #' Given a set of features, will find the most "dominant" bicluster. Works in
 #' parallel using library "multicore." To set the number of cores used, set
 #' options(cores = N).
+#'
 #' @param geneDf data.frame with genes on rows and columns defining conditions
 #' @param nSamples integer denoting the number of permutations to perform
 #' @param lam regularization parameter for conditions (maximum number of conditions allows in a bicluster)
+#' @export
 biclusteringPar <- function(geneDf, nSamples = 100, lam, lam.lwr = 3.5, clustOptions = list())
 {
     mclapply(1:nSamples, function(it) {
@@ -298,6 +279,14 @@ bcSubSampleSerial <- function(geneDf, nSamples = 100, lam, propSample = 0.6, lam
 }
 
 
+#' Given a set of features, will find the most "dominant" bicluster. Works in
+#' parallel using library "multicore." To set the number of cores used, set
+#' options(cores = N).
+#'
+#' @param geneDf data.frame with genes on rows and columns defining conditions
+#' @param nSamples integer denoting the number of permutations to perform
+#' @param lam regularization parameter for conditions (maximum number of conditions allows in a bicluster)
+#' @export
 bcSubSamplePar <- function(geneDf, nSamples = 100, lam, propSample = 0.6, lam.lwr = 3.5,
                            clustOptions = list())
 {
@@ -320,8 +309,6 @@ bcSubSamplePar <- function(geneDf, nSamples = 100, lam, propSample = 0.6, lam.lw
              return(list(ab = abSol, d = d, sccaLam = curSol$sccaLam))
                            })
 }
-
-debug(postSubSample.pca)
 
 # XXX: This is the best performing method
 postSubSample.pca <- function(subSampleSol, abThresh = 0.6, dQuant = 0.5)
@@ -526,7 +513,6 @@ postSubSample.percent <- function(subSampleSol, percentile = 0.95, eps = 0.05)
     return(list(rowIdx = rowIdx, colIdx = colIdx))
 }
 
-debug(postSubSample.percent)
 
 postSubSample.percent2 <- function(subSampleSol, percentile1 = 0.95, eps1 = 0.5,
                                    percentile2 = 0.95, eps2 = 0.5)
@@ -581,8 +567,6 @@ postSubSample.sort <- function(subSampleSol, percentile1 = 0.95, eps1 = 0.5,
 
     return(list(rowIdx = rowIdx, colIdx = colIdx))
 }
-
-debug(postSubSample.sort)
 
 postSubSample.top <- function(subSampleSol, percentile1 = 0.95, eps1 = 0.5,
                                nc)
@@ -641,7 +625,6 @@ postSubSample.median.kmeans <- function(subSampleSol, abQuant = 0.5, dQuant = 0.
 
         which(kRes$cluster == kMax)
     }
-    debugonce(clustKmeans)
 
     rowIdx <- clustKmeans(cbind(abQuant, abSd, abQuant / abSd))
     colIdx <- clustKmeans(cbind(dQuant, dSd))
@@ -693,7 +676,6 @@ postSubSample.median.kmeans2 <- function(subSampleSol, abQuant = 0.5, dQuant = 0
 
         which(kRes$cluster == kMax)
     }
-    # debugonce(clustKmeans)
 
     # rowIdx <- clustKmeans(abStats, 3)
     rowIdx <- clustKmeans(with(abStats, cbind(medRate, sd)), 3)
@@ -914,8 +896,6 @@ postSubSample.mean.kmeans <- function(subSampleSol, abQuant = 0.5, dQuant = 0.5,
 }
 
 
-
-debug(postSubSample.top)
 
 post.hclust <- function(postSample, nAB = 3, nD = 2)
 {
@@ -1149,99 +1129,3 @@ biclustering <- function(geneDf, nSamples = 100)
 
     return(list(a = aVal, b = bVal, ab = abVal, d = dVal, splitIdx = splitIdx))
 }
-
-# load gene data supplied by Ben
-# data is loaded in gene.mat
-source("geneData.R", echo = FALSE)
-
-# data from geneData.R
-hi <- splitEvenly(nrow(gas.mat))
-X.mat <- gas.mat[hi[[1]],] + 1
-Y.mat <- gas.mat[hi[[2]],] + 1
-X.mat <- log(X.mat)
-Y.mat <- log(Y.mat)
-
-X.mat.2 <- X.mat[1:20, 1:10]
-Y.mat.2 <- Y.mat[1:20, 1:10]
-
-startVec <- runif(ncol(X.mat.2))
-
-meow2.optim <- biClustMax.optim(X.mat.2, Y.mat.2, 
-                                startVec,
-                                runif(nrow(X.mat.2), min = -1, max = 1), 
-                                runif(nrow(Y.mat.2), min = -1, max = 1),
-                                6
-                                )
-meow2.optim$d$par
-
-
-# testing cgalC
-Dmat <- matrix(c(2, 0, 0, 8), nrow = 2)
-Amat <- matrix(c(1, 1, -1, 2), nrow = 2, byrow = T)
-bvec <- c(7, 4)
-lwr <- c(0, 0)
-upr <- c(10, 4)
-cvec <- c(0, -32)
-c0 <- 64
-cgalC(Dmat, Amat, bvec, lwr, upr, cvec, c0)
-
-
-
-# attempting to implement using the nlminb function 
-# d is a vector
-# q is a vector
-objectiveQ <- function(d, qVec, lam)
-{
-    sum(0.5 * d^2 * qVec + lam * sum(abs(d)))
-}
-
-startVec <- runif(nrow(meow2))
-
-lapply(seq(0.05, 3, by = 0.05), function(lam) {
-       nlminb(startVec, objectiveQ, 
-              control = list(step.min = 0.05, step.max = 0.10),
-              lower = rep.int(0, length(startVec)), 
-              upper = rep.int(1, length(startVec)),
-              qVec = diag(meow2), lam = -lam)$par
-                           })
-
-
-nlminb(startVec, objectiveQ, 
-       control = list(step.min = 0.05, step.max = 0.10),
-       lower = rep.int(0, length(startVec)), 
-       upper = rep.int(1, length(startVec)),
-       qVec = diag(meow2), lam = 1)
-
-meow2vec <- diag(meow2)
-pos <- rep(0, length(meow2vec))
-pos[which(sign(meow2vec) == -1)] <- 1
-
-objectiveQ(pos, meow2vec, -10)
-
-# testing constrOptim
-testConstrOptim <- function(q, lam, startPos)
-{
-    constrMat<- diag(length(q))
-    constrMat <- rbind(constrMat, -diag(length(q)))
-    constrMat <- rbind(constrMat, rep.int(-1, length(q)))
-    constrLimit <- c(rep(0, length(q)), 
-                     rep(-1, length(q)),
-                     -lam)
-    objectiveFn <- function(d, qVec)
-    {
-        sum(0.5 * d^2 * qVec)
-    }
-    constrOptim(startPos, objectiveFn, grad = NULL,
-                ui = constrMat, ci = constrLimit,
-                qVec = q
-                )
-}
-
-testConstrOptim(meow2vec, 8, startVec)$par
-
-
-# driver
-sol <- maximizeOneSplit(rbind(X.mat.2, Y.mat.2))
-bcSol <- biclustering(rbind(X.mat.2, Y.mat.2), nSamples = 10)
-
-# FIXME: Fix the way it returns... basically make sure return is correct

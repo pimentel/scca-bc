@@ -1,5 +1,3 @@
-debugonce(ggPlotParSolution)
-
 ggPlotParSolution <- function(parSol, clust = NA, fBase = NA, rowNames = NA,
                               colNames = NA)
 {
@@ -81,7 +79,6 @@ plotClusterExpression <- function(dat, clust)
 }
 
 
-# debug(condSizePlot)
 condSizePlot <- function(pssSols, dat, range = NULL, truth = NULL)
 {
     if (is.null(range) || length(pssSols) != length(range))
