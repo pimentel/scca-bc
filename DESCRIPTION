@@ -11,7 +11,7 @@ Imports:
     Rcpp (>= 0.11.3),
     parallel (>= 3.1.1),
     gplots (>= 2.14.2),
-    scca (>= 1.1.1),
+    cluster (>= 1.15.3),
     fscca
 LinkingTo: Rcpp
 Suggests:

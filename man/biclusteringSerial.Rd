@@ -3,11 +3,11 @@
 \alias{biclusteringSerial}
 \title{Serial biclustering}
 \usage{
-biclusteringSerial(expression, nSamples = 100, lam, lam.lwr = 3.5,
+biclusteringSerial(exp_mat, nSamples = 100, lam, lam.lwr = 3.5,
   clustOptions = list())
 }
 \arguments{
-\item{expression}{matrix with features on rows and conditions on columns}
+\item{exp_mat}{matrix with features on rows and conditions on columns}
 
 \item{nSamples}{integer denoting the number of permutations to perform}
 

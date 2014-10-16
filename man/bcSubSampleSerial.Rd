@@ -3,15 +3,15 @@
 \alias{bcSubSampleSerial}
 \title{Serial biclustering}
 \usage{
-bcSubSampleSerial(geneDf, nSamples = 100, lam, propSample = 0.6,
+bcSubSampleSerial(exp_mat, nSamples = 100, lam, propSample = 0.6,
   lam.lwr = 3.5, clustOptions = list())
 }
 \arguments{
+\item{exp_mat}{matrix with features on rows and conditions on columns}
+
 \item{nSamples}{integer denoting the number of permutations to perform}
 
 \item{lam}{regularization parameter for conditions (maximum number of conditions allows in a bicluster)}
-
-\item{expression}{matrix with features on rows and conditions on columns}
 }
 \description{
 Uses one core to perform SCCAB

@@ -1,4 +1,5 @@
 # XXX: This is the best performing method
+#' @export
 postSubSample.pca <- function(subSampleSol, abThresh = 0.6, dQuant = 0.5)
 {
     # rows are different permutations,
@@ -44,20 +45,11 @@ postSubSample.pca <- function(subSampleSol, abThresh = 0.6, dQuant = 0.5)
         return(dat)
     }
 
-    ab <- bootStrapNAs(ab, 0.05, 0.95)
-    # print(sum(is.infinite(ab)))
-    # print(sum(is.na(ab)))
+    if (sum(is.na(ab)) > 0)
+        ab <- bootStrapNAs(ab, 0.05, 0.95)
 
-    # a_ply(ab, 2, function(x) 
-    #       {
-    #           if(any(is.na(x))) print(x)
-    #       }
-    # )
-
-    # print(summary(ab))
-    # print(summary(t(ab)))
-
-    pcaAB <- prcomp(ab, center = F, scale. = F)
+    # pcaAB <- prcomp(ab, center = F, scale. = F)
+    pcaAB <- prcomp(ab)
     pcaAB$rotation <- as.data.frame(data.matrix(as.data.frame(pcaAB$rotation, stringsAsFactors = F)))
 
     pcaAB$rotation[,"mean"] <- apply(ab, 2, mean, na.rm = T)
@@ -70,18 +62,6 @@ postSubSample.pca <- function(subSampleSol, abThresh = 0.6, dQuant = 0.5)
     dQuant <- apply(d, 2, quantile, probs = dQuant, na.rm = T)
     dSd <- apply(d, 2, sd, na.rm = T)
 
-    clustKmeans <- function(dat, minK = 2)
-    {
-        gap <- clusGap(as.matrix(dat), kmeans, 5)
-        nk <- maxSE(gap$Tab[,"gap"], gap$Tab[,"SE.sim"])
-        if (nk == 1)
-            nk <- minK
-        cat("Conditions k: ", nk, "\n")
-        kRes <- kmeans(dat, nk, nstart = 20)
-        kMax <- which.max(kRes$centers[,1])
-
-        which(kRes$cluster == kMax)
-    }
 
     # colIdx <- clustKmeans(cbind(dQuant, dSd))
     # rowIdx <- clustKmeans(with(pcaAB$rotation, cbind(-PC1 * sdev[1], PC2 * sdev[2])))
@@ -89,7 +69,8 @@ postSubSample.pca <- function(subSampleSol, abThresh = 0.6, dQuant = 0.5)
     df <- cbind(-pcaAB$rotation$PC1 * pcaAB$sdev[1], 
                                 pcaAB$rotation$PC2 * pcaAB$sdev[2])
     rowIdx <- clustKmeans(df)
-    df2 <- cbind(-pcaD$rotation[,"PC1"] * pcaD$sdev[1]) 
+    df2 <- cbind(-pcaD$rotation[,"PC1"] * pcaD$sdev[1],
+        rnorm(nrow(pcaD$rotation), sd = 0.0001))
                  # pcaD$rotation[,"PC2"] * pcaD$sdev[2])
     colIdx <- clustKmeans(df2)
     # colIdx <- clustKmeans(cbind(dQuant))
@@ -98,8 +79,41 @@ postSubSample.pca <- function(subSampleSol, abThresh = 0.6, dQuant = 0.5)
     pcaD$rotation[,"cluster"] <- "background"
     pcaD$rotation[colIdx,"cluster"] <- "bicluster"
 
-    # return(list(abDat = pcaAB$rotation, dDat = pcaD, cluster = list(rowIdx = rowIdx, colIdx = colIdx)))
-    return(list(rowIdx = rowIdx, colIdx = colIdx))
+    return(list(abDat = data.frame(pcaAB$rotation, sdev = pcaAB$sdev), dDat = pcaD,
+            rowIdx = rowIdx, colIdx = colIdx))
+    # return(list(rowIdx = rowIdx, colIdx = colIdx))
+}
+
+clustKmeans <- function(dat, minK = 2)
+{
+    gap <- clusGap(as.matrix(dat), kmeans, 5)
+    nk <- maxSE(gap$Tab[,"gap"], gap$Tab[,"SE.sim"])
+    if (nk == 1)
+        nk <- minK
+    cat("Conditions k: ", nk, "\n")
+    kRes <- kmeans(dat, nk, nstart = 20)
+    kMax <- which.max(kRes$centers[,1])
+
+    which(kRes$cluster == kMax)
+}
+
+#' @export
+postSubSample.ranks <- function(subSampleSol)
+{
+    ab <- getA(subSampleSol)
+    ab_rank <- apply(ab, 2, rank, na.last = "keep")
+    print(dim(ab))
+
+    pca_ab <- prcomp(t(ab_rank), center = F, scale. = F)
+    ab_features <- cbind(-pca_ab$rotation[,1] * pca_ab$sdev[1],
+        pca_ab$rotation[,2] * pca_ab$sdev[2])
+    rowIdx <- clustKmeans(ab_features)
+    ab_features <- data.frame(ab_features)
+    colnames(ab_features) <- c("PC1", "PC2")
+    ab_features$in_clust <- FALSE
+    ab_features$in_clust[rowIdx] <- TRUE
+
+    return(list(ab_rank = ab_rank, rowIdx = rowIdx, ab_features = ab_features))
 }
 
 postSubSample <- function(subSampleSol, percentile = 0.75)

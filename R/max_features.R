@@ -16,5 +16,24 @@ features_max_fscca <- function(X, Y, d, lam_a, lam_b)
 
     capture.output(res <- fscca(xTilde, yTilde, "lasso", "lasso", lam_a, lam_b))
 
-    return(list(a = res$A[,1], b = res$B[,1]))
+    return(list(a = res$A[,1], b = res$B[,1], lambda = res$lambda))
 }
+
+# the old functionality
+    # if (verbose)
+    #     cat("Using penalty: ", pen, "\n")
+
+    # sccaRes <- scca(as.matrix(xTilde), as.matrix(yTilde), 
+    #                 nc = 1, 
+    #                 penalty = pen,
+    #                 lamx = lamx,
+    #                 lamy = lamx,
+    #                 tuning = cv,
+    #                 center = TRUE, scale = TRUE)
+    # a <- as.numeric(sccaRes$A)
+    # b <- as.numeric(sccaRes$B)
+
+    # if (verbose)
+    #     cat("Computing SCCA component\n")
+
+

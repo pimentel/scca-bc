@@ -3,7 +3,7 @@
 \alias{maximizeOneSplit}
 \title{Driver function to find solution for}
 \usage{
-maximizeOneSplit(geneDf, lam, epsA = 0.001, epsB = 0.001, epsD = 0.01,
+maximizeOneSplit(exp_mat, lam, epsA = 0.001, epsB = 0.001, epsD = 0.01,
   maxIt = 100, lam.lwr, clustOptions = list())
 }
 \description{

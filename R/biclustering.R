@@ -5,7 +5,7 @@
 #' 
 #' @param n the number of indices
 #' @return a list with two disjoint sets of indices from 1 to n.
-splitEvenly <- function(n)
+split_evenly <- function(n)
 {
     if ( n %% 2 != 0)
     {
@@ -30,30 +30,9 @@ splitEvenly <- function(n)
 biClustMax.optim <- function(X, Y, d.start, lam, verbose = TRUE, lam.lwr = 3.5,
     clustOptions = list())
 {
-
-    # pen <- "LASSO"
-    # if (!is.null(clustOptions$penalty))
-    #     pen <- clustOptions$penalty
-
     lamx <- 1:3
     if (!is.null(clustOptions$lamx))
         lamx <- clustOptions$lamx
-
-    # if (verbose)
-    #     cat("Using penalty: ", pen, "\n")
-
-    # sccaRes <- scca(as.matrix(xTilde), as.matrix(yTilde), 
-    #                 nc = 1, 
-    #                 penalty = pen,
-    #                 lamx = lamx,
-    #                 lamy = lamx,
-    #                 tuning = cv,
-    #                 center = TRUE, scale = TRUE)
-    # a <- as.numeric(sccaRes$A)
-    # b <- as.numeric(sccaRes$B)
-
-    # if (verbose)
-    #     cat("Computing SCCA component\n")
 
     # First maximize a and b using SCCA
     res <- features_max_fscca(X, Y, d.start, lamx, lamx)
@@ -66,33 +45,13 @@ biClustMax.optim <- function(X, Y, d.start, lam, verbose = TRUE, lam.lwr = 3.5,
     return(list(a = a, b = b, d = d_optim, q, sccaLam = res$lambda))
 }
 
-
-# TODO: Replace the regular distance in maximizeOneSplit with pDiff and see how
-# affects convergence
-p_diff <- function(old, new)
-{
-    num <- dist(rbind(old, new))[1]
-    denom <- sqrt(sum(old^2))
-    num / denom
-}
-
-mean_relative_tol <- function(old, new)
-{
-    mean(abs(1 - new / old ))
-}
-
-mean_absolute_tol <- function(old, new)
-{
-    mean(abs(new - old))
-}
-
 ##' Driver function to find solution for 
-maximizeOneSplit <- function(geneDf, lam, epsA = 0.001, epsB = 0.001, epsD = 0.01, maxIt = 100, lam.lwr, 
+maximizeOneSplit <- function(exp_mat, lam, epsA = 0.001, epsB = 0.001, epsD = 0.01, maxIt = 100, lam.lwr, 
                              clustOptions = list())
 {
-    splitIdx <- splitEvenly(nrow(geneDf))
-    xDf <- geneDf[splitIdx[[1]], ]
-    yDf <- geneDf[splitIdx[[2]], ]
+    splitIdx <- split_evenly(nrow(exp_mat))
+    X <- exp_mat[splitIdx[[1]], ]
+    Y <- exp_mat[splitIdx[[2]], ]
 
     # randomly initialize d
     # FIXME: If there are lots of conditions, possible that won't be able to
@@ -103,32 +62,33 @@ maximizeOneSplit <- function(geneDf, lam, epsA = 0.001, epsB = 0.001, epsD = 0.0
     maxUnif <- 1
 
     repeat { 
-        d <- runif(ncol(xDf), max = maxUnif)
+        d <- runif(ncol(X), max = maxUnif)
         if (sum(d) <= lam)
             break
         else
-            maxUnif <- min(0.05, maxUnif - 0.05)
+            maxUnif <- min(minUnif + 0.01, maxUnif - 0.05)
     }
 
     # NB: values of a and b are not important currently since evaluated after d is set.
     # If ever change the order, fix this.
-    a <- b <- runif(nrow(xDf), min = -1, max = 1)
+    a <- b <- runif(nrow(X), min = -1, max = 1)
     it <- 1
     curSol <- list()
+    cat(sprintf("% 10s% 7s% 7s\n", "a", "b", "d"))
     repeat {
         # cat("\tOne split iteration: ", it, "\n")
-        curSol <- biClustMax.optim(xDf, yDf, d, lam, lam.lwr = lam.lwr, clustOptions = clustOptions)
+        curSol <- biClustMax.optim(X, Y, d, lam, lam.lwr = lam.lwr, clustOptions = clustOptions)
 
         a_dist <- dist(rbind(curSol$a, a))[1]
         b_dist <- dist(rbind(curSol$b, b))[1]
         # d_dist <- dist(rbind(curSol$d, d))[1]
         d_dist <- mean_absolute_tol(d, curSol$d)
 
-        cat(sprintf("\t\tdist:\t%.4f\t%.4f\t%.4f\n", a_dist, b_dist, d_dist))
+        cat(sprintf("\t%.4f\t%.4f\t%.4f\n", a_dist, b_dist, d_dist))
 
         if (a_dist < epsA && b_dist < epsB && d_dist < epsD && it >= 3) 
         {
-            cat("\tConverged. Iteration: ", it, "\n")
+            cat("\tConverged. Number of iterations: ", it, "\n")
             break
         }
 
@@ -138,7 +98,7 @@ maximizeOneSplit <- function(geneDf, lam, epsA = 0.001, epsB = 0.001, epsD = 0.0
         it <- it + 1
         if (it > maxIt)
         {
-            cat("Warning: exceed maximum number of iterations (", maxIt, ")\n")
+            cat("Warning: exceeded maximum number of iterations (", maxIt, ")\n")
             break
         }
     }
@@ -160,15 +120,18 @@ maximizeOneSplit <- function(geneDf, lam, epsA = 0.001, epsB = 0.001, epsD = 0.0
 #' parallel using library "multicore." To set the number of cores used, set
 #' options(cores = N).
 #'
-#' @param expression matrix with features on rows and conditions on columns
+#' @param exp_mat matrix with features on rows and conditions on columns
 #' @param nSamples integer denoting the number of permutations to perform
 #' @param lam regularization parameter for conditions (maximum number of conditions allows in a bicluster)
 #' @export
-biclusteringPar <- function(expression, nSamples = 100, lam, lam.lwr = 3.5, clustOptions = list())
+biclusteringPar <- function(exp_mat, nSamples = 100, lam, lam.lwr = 3.5, clustOptions = list())
 {
+    if (!is.matrix(exp_mat))
+        stop("biclustering requires a matrix")
+
     mclapply(1:nSamples, function(it) {
              cat("Biclustering iteration: ", it, "\n")
-             curSol <- maximizeOneSplit(expression, lam = lam, lam.lwr = lam.lwr, clustOptions = clustOptions)
+             curSol <- maximizeOneSplit(exp_mat, lam = lam, lam.lwr = lam.lwr, clustOptions = clustOptions)
              return(curSol)
             })
 }
@@ -179,16 +142,18 @@ biclusteringPar <- function(expression, nSamples = 100, lam, lam.lwr = 3.5, clus
 #' parallel using library "multicore." To set the number of cores used, set
 #' options(cores = N).
 #'
-#' @param expression matrix with features on rows and conditions on columns
+#' @param exp_mat matrix with features on rows and conditions on columns
 #' @param nSamples integer denoting the number of permutations to perform
 #' @param lam regularization parameter for conditions (maximum number of conditions allows in a bicluster)
 #' @export
-biclusteringSerial <- function(expression, nSamples = 100, lam, lam.lwr = 3.5, clustOptions = list())
+biclusteringSerial <- function(exp_mat, nSamples = 100, lam, lam.lwr = 3.5, clustOptions = list())
 {
+    if (!is.matrix(exp_mat))
+        stop("biclustering requires a matrix")
 
     lapply(1:nSamples, function(it) {
         cat("Biclustering iteration: ", it, "\n")
-        curSol <- maximizeOneSplit(expression, lam = lam, lam.lwr = lam.lwr, clustOptions = clustOptions)
+        curSol <- maximizeOneSplit(exp_mat, lam = lam, lam.lwr = lam.lwr, clustOptions = clustOptions)
         return(curSol)
             })
 }
@@ -198,26 +163,29 @@ biclusteringSerial <- function(expression, nSamples = 100, lam, lam.lwr = 3.5, c
 #'
 #' Uses one core to perform SCCAB
 #'
-#' @param expression matrix with features on rows and conditions on columns
+#' @param exp_mat matrix with features on rows and conditions on columns
 #' @param nSamples integer denoting the number of permutations to perform
 #' @param lam regularization parameter for conditions (maximum number of conditions allows in a bicluster)
 #' @export
-bcSubSampleSerial <- function(geneDf, nSamples = 100, lam, propSample = 0.6, lam.lwr = 3.5,
+bcSubSampleSerial <- function(exp_mat, nSamples = 100, lam, propSample = 0.6, lam.lwr = 3.5,
                            clustOptions = list())
 {
+    if (!is.matrix(exp_mat))
+        stop("biclustering requires a matrix")
+
     if (propSample > 1 | propSample < 0.01)
         stop("Invalid range for propSample")
 
-    nRowsSample <- round(propSample * nrow(geneDf) )
+    nRowsSample <- round(propSample * nrow(exp_mat) )
     if (nRowsSample %% 2)
         nRowsSample <- nRowsSample + 1
 
     cat("Sampling ", nRowsSample, " features\n")
     lapply(1:nSamples, function(it) {
            cat("**Biclustering iteration: ", it, "\n")
-           sampIdx <- sample.int(nrow(geneDf), size = nRowsSample)
-           abSol <- rep.int(NA, nrow(geneDf))
-           curSol <- maximizeOneSplit(geneDf[sampIdx,], lam, lam.lwr = lam.lwr, 
+           sampIdx <- sample.int(nrow(exp_mat), size = nRowsSample)
+           abSol <- rep.int(NA, nrow(exp_mat))
+           curSol <- maximizeOneSplit(exp_mat[sampIdx,], lam, lam.lwr = lam.lwr, 
                                       clustOptions = clustOptions)
            abSol[sampIdx] <- curSol$ab
            d <- curSol$d
@@ -230,31 +198,29 @@ bcSubSampleSerial <- function(geneDf, nSamples = 100, lam, propSample = 0.6, lam
 #' parallel using library "multicore." To set the number of cores used, set
 #' options(cores = N).
 #'
-#' @param geneDf data.frame with genes on rows and columns defining conditions
+#' @param exp_mat matrix with genes on rows and columns defining conditions
 #' @param nSamples integer denoting the number of permutations to perform
 #' @param lam regularization parameter for conditions (maximum number of conditions allows in a bicluster)
 #' @export
-bcSubSamplePar <- function(geneDf, nSamples = 100, lam, propSample = 0.6, lam.lwr = 3.5,
+bcSubSamplePar <- function(exp_mat, nSamples = 100, lam, propSample = 0.6, lam.lwr = 3.5,
                            clustOptions = list())
 {
     if (propSample > 1 | propSample < 0.01)
         stop("Invalid range for propSample")
 
-    nRowsSample <- round(propSample * nrow(geneDf) )
+    nRowsSample <- round(propSample * nrow(exp_mat) )
     if (nRowsSample %% 2)
         nRowsSample <- nRowsSample + 1
 
     cat("Sampling ", nRowsSample, " features\n")
     mclapply(1:nSamples, function(it) {
              cat("**Biclustering iteration: ", it, "\n")
-             sampIdx <- sample.int(nrow(geneDf), size = nRowsSample)
-             abSol <- rep.int(NA, nrow(geneDf))
-             curSol <- maximizeOneSplit(geneDf[sampIdx,], lam, lam.lwr = lam.lwr, 
+             sampIdx <- sample.int(nrow(exp_mat), size = nRowsSample)
+             abSol <- rep.int(NA, nrow(exp_mat))
+             curSol <- maximizeOneSplit(exp_mat[sampIdx,], lam, lam.lwr = lam.lwr, 
                                         clustOptions = clustOptions)
              abSol[sampIdx] <- curSol$ab
              d <- curSol$d
              return(list(ab = abSol, d = d, sccaLam = curSol$sccaLam))
                            })
 }
-
-
