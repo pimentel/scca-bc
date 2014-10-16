@@ -1,3 +1,17 @@
+#' Maximize the d vector in biclustering
+#'
+#' Find the solution to the quadratic program:
+#' \eqn{q = a^T X b^T Y}
+#' \eqn{f(d) = d^2 * q}
+#' \eqn{s.t. ||d|| <= s, 0 <= d_i <= 1}
+#'
+#' @param X a matrix with features on rows
+#' @param Y a matrix with features on rows
+#' @param a fixed estimates of feature coefficients on X
+#' @param b fixed estimates of feature coefficients on Y
+#' @param s a regularization parameter such that \eqn{s > 0} and \eqn{d^T q d  <= s}
+#' @return a valid maximum
+#' @export
 lasso_max_d <- function(X, Y, a, b, s)
 {
     Xs <- scale(X)
@@ -7,15 +21,6 @@ lasso_max_d <- function(X, Y, a, b, s)
     .lasso_max_d(q, s)
 }
 
-#' Maximize the d vector in biclustering
-#'
-#' Find the solution to the quadratic program:
-#' f(d) = d^2 * q
-#' s.t. |d| <= s, 0 <= d_i <= 1
-#'
-#' @param q a vector of length k, where k is the number of conditions
-#' @param s a regularization parameter such that s > 0 and t(d) *%* q %* d  <= s
-#' @return a valid maximum
 #' @export
 .lasso_max_d <- function(q, s)
 {
