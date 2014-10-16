@@ -1,4 +1,4 @@
-context("Maximizing condition coefficients (Lasso)")
+context("Max condition coef (Lasso)")
 
 test_that("Regularization",
     {
@@ -19,7 +19,7 @@ test_that("Regularization",
 # .lasso_max_d(c(1, 30, 30, 30, 30), 0.7)
 # .lasso_max_d(c(NA, 30, 30, 30, 30), 0.7)
 
-context("Maximizing feature coefficients (SCCA)")
+context("Max feature coef (SCCA)")
 
 test_that("Correct dimension",
     {
@@ -34,4 +34,13 @@ test_that("Correct dimension",
 
         expect_equal(length(res$a), n)
         expect_equal(length(res$b), n)
+    })
+
+context("Misc supp functions")
+
+test_that("Distances in vectors",
+    {
+        cat(mean_relative_tol(c(1, 1, 1, 1), c(1, 0.8, 1, 1)), fill = T)
+        cat(mean_absolute_tol(c(1, 1, 1, 1), c(1, 0.8, 1, 1)), fill = T)
+        cat(p_diff(c(1, 1, 1, 1), c(1, 0.8, 1, 1)), fill = T)
     })

@@ -1,4 +1,7 @@
-#' Randomly splits indices if there are an even number
+#' Randomly split a set of indices
+#'
+#' Randomly splits indices if there are an even number. If there is an odd
+#' number, it will stop().
 #' 
 #' @param n the number of indices
 #' @return a list with two disjoint sets of indices from 1 to n.
@@ -12,19 +15,20 @@ splitEvenly <- function(n)
     return(sets)
 }
 
+#' Optimizing the biclustering function
+#'
+#'
 #' One iteration of biclustering maximization. Takes the current values of 
-#' d, a, b and if successful returns one iteration
+#' d, and if successful returns one iteration.
 #' 
-#' @param xDf matrix with rows representing genes and columns representing conditions (n x k)
-#' @param yDf matrix with rows representing genes and columns representing conditions (n x k)
-#' @param d vector of dimension k
-#' @param a vector of dimension n
-#' @param b vector of dimension n
+#' @param X matrix with rows representing genes and columns representing conditions (n x k)
+#' @param Y matrix with rows representing genes and columns representing conditions (n x k)
+#' @param d.start vector of dimension k
 #' @param lam maximum cluster size
 #' @return A list containing maximum values of a, b, d
 #' @export
-biClustMax.optim <- function(X, Y, d.start, a, b, lam, verbose = TRUE,
-    optim.max = 4, lam.lwr = 3.5, clustOptions = list())
+biClustMax.optim <- function(X, Y, d.start, lam, verbose = TRUE, lam.lwr = 3.5,
+    clustOptions = list())
 {
 
     # pen <- "LASSO"
@@ -48,8 +52,8 @@ biClustMax.optim <- function(X, Y, d.start, a, b, lam, verbose = TRUE,
     # a <- as.numeric(sccaRes$A)
     # b <- as.numeric(sccaRes$B)
 
-    if (verbose)
-        cat("Computing SCCA component\n")
+    # if (verbose)
+    #     cat("Computing SCCA component\n")
 
     # First maximize a and b using SCCA
     res <- features_max_fscca(X, Y, d.start, lamx, lamx)
@@ -65,25 +69,30 @@ biClustMax.optim <- function(X, Y, d.start, a, b, lam, verbose = TRUE,
 
 # TODO: Replace the regular distance in maximizeOneSplit with pDiff and see how
 # affects convergence
-pDiff <- function(old, new)
+p_diff <- function(old, new)
 {
     num <- dist(rbind(old, new))[1]
     denom <- sqrt(sum(old^2))
     num / denom
 }
 
+mean_relative_tol <- function(old, new)
+{
+    mean(abs(1 - new / old ))
+}
+
+mean_absolute_tol <- function(old, new)
+{
+    mean(abs(new - old))
+}
+
 ##' Driver function to find solution for 
-maximizeOneSplit <- function(geneDf, lam, epsA = 0.1, epsB = 0.1, epsD = 0.1, maxIt = 100, lam.lwr, 
+maximizeOneSplit <- function(geneDf, lam, epsA = 0.001, epsB = 0.001, epsD = 0.01, maxIt = 100, lam.lwr, 
                              clustOptions = list())
 {
     splitIdx <- splitEvenly(nrow(geneDf))
     xDf <- geneDf[splitIdx[[1]], ]
     yDf <- geneDf[splitIdx[[2]], ]
-
-    # TODO: implement cross validation for lambda
-    # lam <- round(min(dim(xDf)) * .3)
-    # lam <- 20 * 2
-
 
     # randomly initialize d
     # FIXME: If there are lots of conditions, possible that won't be able to
@@ -101,46 +110,25 @@ maximizeOneSplit <- function(geneDf, lam, epsA = 0.1, epsB = 0.1, epsD = 0.1, ma
             maxUnif <- min(0.05, maxUnif - 0.05)
     }
 
-    # FIXME: temporarily commenting out until figure out why not working correctly
-    # UPDATE: This bug appears when force there to be a minimum number of conditions which are being selected
-    # repeat {
-    #     d <- runif(ncol(xDf), min = minUnif, max = maxUnif)
-    #     sumD <- sum(d)
-    #     if (sumD <= lam & sumD >= lam.lwr)
-    #         break
-    #     else if (sumD < lam.lwr)
-    #         minUnif <- min(minUnif + 0.03, maxUnif - 0.03)
-    #     else
-    #         maxUnif <- max(minUnif + 0.04, maxUnif - 0.04)
-
-    # }
-    # if (sum(d) < lam.lwr)
-    # {
-    #     cat("ERROR! sum(d) < lam.lwr\n")
-    #     cat("ERROR! sum(d) < lam.lwr\n")
-    #     cat("ERROR! sum(d) < lam.lwr\n")
-    #     cat("ERROR! sum(d) < lam.lwr\n")
-    #     cat("ERROR! sum(d) < lam.lwr\n")
-    #     cat("ERROR! sum(d) < lam.lwr\n")
-    # }
-    cat("sum(d)", sum(d), "\n") 
     # NB: values of a and b are not important currently since evaluated after d is set.
     # If ever change the order, fix this.
     a <- b <- runif(nrow(xDf), min = -1, max = 1)
     it <- 1
-    curSol <- 0
+    curSol <- list()
     repeat {
-        cat("\tOne split iteration: ", it, "\n")
-        curSol <- biClustMax.optim(xDf, yDf, d, a, b, lam, lam.lwr = lam.lwr, clustOptions = clustOptions)
-        cat ("\t\tdist: ",
-             dist(rbind(curSol$a, a))[1], "\t",
-             dist(rbind(curSol$b, b))[1], "\t",
-             dist(rbind(curSol$d, d))[1], "\n")
-        if (dist(rbind(curSol$a, a))[1] < epsA &
-            dist(rbind(curSol$b, b))[1] < epsB &
-            dist(rbind(curSol$d, d))[1] < epsD & it > 2) # potentially remove it > 2
+        # cat("\tOne split iteration: ", it, "\n")
+        curSol <- biClustMax.optim(xDf, yDf, d, lam, lam.lwr = lam.lwr, clustOptions = clustOptions)
+
+        a_dist <- dist(rbind(curSol$a, a))[1]
+        b_dist <- dist(rbind(curSol$b, b))[1]
+        # d_dist <- dist(rbind(curSol$d, d))[1]
+        d_dist <- mean_absolute_tol(d, curSol$d)
+
+        cat(sprintf("\t\tdist:\t%.4f\t%.4f\t%.4f\n", a_dist, b_dist, d_dist))
+
+        if (a_dist < epsA && b_dist < epsB && d_dist < epsD && it >= 3) 
         {
-            cat("\tConverged.\n")
+            cat("\tConverged. Iteration: ", it, "\n")
             break
         }
 
@@ -154,21 +142,20 @@ maximizeOneSplit <- function(geneDf, lam, epsA = 0.1, epsB = 0.1, epsD = 0.1, ma
             break
         }
     }
+
     # NB: If there is something funky with the distribution of a and b, 
     # check here... though this should work correctly
-    # a <- rep.int(0, length(a))
-    # b <- rep.int(0, length(b))
-    ab <- rep.int(0, length(b*2))
+    ab <- rep.int(0, length(b)*2)
     ab[splitIdx[[1]]] <- curSol$a
     ab[splitIdx[[2]]] <- curSol$b
-    # a[splitIdx[[1]]] <- curSol$a
-    # b[splitIdx[[2]]] <- curSol$b
 
     return(list(a = a, b = b, ab = ab, d = round(curSol$d, digits = 4),
                 splitIdx = splitIdx, sccaLam = curSol$sccaLam))
 }
 
 
+#' Serial biclustering
+#'
 #' Given a set of features, will find the most "dominant" bicluster. Works in
 #' parallel using library "multicore." To set the number of cores used, set
 #' options(cores = N).
@@ -183,6 +170,26 @@ biclusteringPar <- function(expression, nSamples = 100, lam, lam.lwr = 3.5, clus
              cat("Biclustering iteration: ", it, "\n")
              curSol <- maximizeOneSplit(expression, lam = lam, lam.lwr = lam.lwr, clustOptions = clustOptions)
              return(curSol)
+            })
+}
+
+#' Serial biclustering
+#'
+#' Given a set of features, will find the most "dominant" bicluster. Works in
+#' parallel using library "multicore." To set the number of cores used, set
+#' options(cores = N).
+#'
+#' @param expression matrix with features on rows and conditions on columns
+#' @param nSamples integer denoting the number of permutations to perform
+#' @param lam regularization parameter for conditions (maximum number of conditions allows in a bicluster)
+#' @export
+biclusteringSerial <- function(expression, nSamples = 100, lam, lam.lwr = 3.5, clustOptions = list())
+{
+
+    lapply(1:nSamples, function(it) {
+        cat("Biclustering iteration: ", it, "\n")
+        curSol <- maximizeOneSplit(expression, lam = lam, lam.lwr = lam.lwr, clustOptions = clustOptions)
+        return(curSol)
             })
 }
 
@@ -1042,30 +1049,4 @@ bcMultipleClusters.kmeans <- function(geneDf, lam, nClusters, nSamples = 100)
     }
 
     return(list(allBcSol = allBcSol, clusters = clusters))
-}
-
-
-
-# XXX: OBSOLETE! This is mostly still here for testing... 
-biclustering <- function(geneDf, nSamples = 100)
-{
-    it <- 1
-    aVal <- list()
-    bVal <- list()
-    dVal <- list()
-    abVal <- list()
-    splitIdx <- list()
-    while (it <= nSamples) 
-    {
-        cat("Biclustering iteration: ", it, "\n")
-        curSol <- maximizeOneSplit(geneDf)
-        aVal <- append(aVal, list(curSol$a))
-        bVal <- append(bVal, list(curSol$b))
-        dVal <- append(dVal, list(curSol$d))
-        abVal <- append(abVal, list(curSol$ab))
-        splitIdx <- append(splitIdx, list(curSol$splitIdx))
-        it <- it + 1
-    }
-
-    return(list(a = aVal, b = bVal, ab = abVal, d = dVal, splitIdx = splitIdx))
 }
