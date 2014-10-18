@@ -1,3 +1,20 @@
+#' Randomly split a set of indices
+#'
+#' Randomly splits indices if there are an even number. If there is an odd
+#' number, it will stop().
+#' 
+#' @param n the number of indices
+#' @return a list with two disjoint sets of indices from 1 to n.
+split_evenly <- function(n)
+{
+    if ( n %% 2 != 0)
+        stop("Not an even number of samples!")
+
+    sets <- split(sample.int(n), 1:2)
+
+    sets
+}
+
 vScore <- function(set1, set2)
 {
     length(intersect(set1, set2)) / length(union(set1, set2))

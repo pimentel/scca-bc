@@ -1,20 +1,3 @@
-#' Randomly split a set of indices
-#'
-#' Randomly splits indices if there are an even number. If there is an odd
-#' number, it will stop().
-#' 
-#' @param n the number of indices
-#' @return a list with two disjoint sets of indices from 1 to n.
-split_evenly <- function(n)
-{
-    if ( n %% 2 != 0)
-    {
-        stop("Not an even number of samples!")
-    }
-    sets <- split(sample.int(n), 1:2)
-    return(sets)
-}
-
 #' Optimizing the biclustering function
 #'
 #' One iteration of biclustering maximization. Takes the current values of 
@@ -35,16 +18,13 @@ biClustMax.optim <- function(X, Y, d.start, lam, verbose = TRUE, lam.lwr = 3.5,
 
     # First maximize a and b using SCCA
     res <- features_max_fscca(X, Y, d.start, lamx, lamx)
-    a <- res$a
-    b <- res$b
 
     d_optim <- lasso_max_d(X, Y, res$a, res$b, lam)
 
-
-    return(list(a = a, b = b, d = d_optim, q, sccaLam = res$lambda))
+    list(a = res$a, b = res$b, d = d_optim, q, sccaLam = res$lambda)
 }
 
-##' Driver function to find solution for 
+#' Maximize one split of the SCCAB algorithm
 maximizeOneSplit <- function(exp_mat, lam, epsA = 0.001, epsB = 0.001,
     epsD = 0.01, maxIt = 100, lam.lwr, clustOptions = list())
 {
@@ -112,11 +92,11 @@ maximizeOneSplit <- function(exp_mat, lam, epsA = 0.001, epsB = 0.001,
     ab[splitIdx[[1]]] <- curSol$a
     ab[splitIdx[[2]]] <- curSol$b
 
-    return(list(a = a, b = b, ab = ab, d = round(curSol$d, digits = 4),
-                splitIdx = splitIdx, sccaLam = curSol$sccaLam))
+    list(a = a, b = b, ab = ab, d = round(curSol$d, digits = 4),
+        splitIdx = splitIdx, sccaLam = curSol$sccaLam)
 }
 
-#' Parallel biclustering
+#' SCCAB(iclustering) (with all data)
 #'
 #' Given a set of features, will find the most "dominant" bicluster. Works in
 #' parallel using library "multicore." To set the number of cores used, set
@@ -124,105 +104,68 @@ maximizeOneSplit <- function(exp_mat, lam, epsA = 0.001, epsB = 0.001,
 #'
 #' @param exp_mat matrix with features on rows and conditions on columns
 #' @param nSamples integer denoting the number of permutations to perform
+#' @param parallel if TRUE, use parallel::mclapply instead of lapply
 #' @param lam regularization parameter for conditions (maximum number of conditions allows in a bicluster)
+#' @param lam_lwr the lower boundary lambda (minimum number of conditions)
+#' @param parallel if TRUE use parallel::mclapply, else use lapply
+#' @param clust_opt a list of additional cluster options
 #' @export
-biclusteringPar <- function(exp_mat, nSamples = 100, lam, lam.lwr = 3.5, clustOptions = list())
+sccab <- function(exp_mat, nSamples = 100, lam, lam.lwr = 3.5, parallel = FALSE, clustOptions = list())
 {
     if (!is.matrix(exp_mat))
         stop("biclustering requires a matrix")
 
-    mclapply(1:nSamples, function(it) {
-             cat("Biclustering iteration: ", it, "\n")
-             curSol <- maximizeOneSplit(exp_mat, lam = lam, lam.lwr = lam.lwr, clustOptions = clustOptions)
-             return(curSol)
-            })
-}
+    apply_fun <- lapply
+    if (parallel)
+        apply_fun <- parallel::mclapply
 
-#' Serial biclustering
-#'
-#' Given a set of features, will find the most "dominant" bicluster. Works in
-#' parallel using library "multicore." To set the number of cores used, set
-#' options(cores = N).
-#'
-#' @param exp_mat matrix with features on rows and conditions on columns
-#' @param nSamples integer denoting the number of permutations to perform
-#' @param lam regularization parameter for conditions (maximum number of conditions allows in a bicluster)
-#' @export
-biclusteringSerial <- function(exp_mat, nSamples = 100, lam, lam.lwr = 3.5, clustOptions = list())
-{
-    if (!is.matrix(exp_mat))
-        stop("biclustering requires a matrix")
-
-    lapply(1:nSamples, function(it) {
+    apply_fun(1:nSamples, function(it) {
         cat("Biclustering iteration: ", it, "\n")
-        curSol <- maximizeOneSplit(exp_mat, lam = lam, lam.lwr = lam.lwr, clustOptions = clustOptions)
-        return(curSol)
-            })
+        maximizeOneSplit(exp_mat, lam = lam, lam.lwr = lam.lwr,
+            clustOptions = clustOptions)
+        })
 }
 
-#' Serial biclustering with subsampling
+#' SCCAB(iclustering) with subsampling
 #'
-#' Uses one core to perform SCCAB
+#' Given a set of features, will find the most "dominant" bicluster. Works in
+#' parallel using library "multicore." To set the number of cores used, set
+#' options(mc.cores = N).
 #'
 #' @param exp_mat matrix with features on rows and conditions on columns
-#' @param nSamples integer denoting the number of permutations to perform
+#' @param n_samp integer denoting the number of permutations to perform
 #' @param lam regularization parameter for conditions (maximum number of conditions allows in a bicluster)
+#' @param prop Proportion to subsample
+#' @param lam_lwr the lower boundary lambda (minimum number of conditions)
+#' @param parallel if TRUE use parallel::mclapply, else use lapply
+#' @param clust_opt a list of additional cluster options
 #' @export
-bcSubSampleSerial <- function(exp_mat, nSamples = 100, lam, propSample = 0.6, lam.lwr = 3.5,
-                           clustOptions = list())
+sccab_subsample <- function(exp_mat, n_samp = 100, lam, prop = 0.6, lam_lwr = 3.5,
+    parallel = FALSE, clust_opt = list())
 {
     if (!is.matrix(exp_mat))
         stop("biclustering requires a matrix")
 
-    if (propSample > 1 | propSample < 0.01)
-        stop("Invalid range for propSample")
+    if (prop > 1 | prop < 0.01)
+        stop("Invalid range for prop")
 
-    nRowsSample <- round(propSample * nrow(exp_mat) )
+    nRowsSample <- round(prop * nrow(exp_mat))
     if (nRowsSample %% 2)
         nRowsSample <- nRowsSample + 1
 
-    cat("Sampling ", nRowsSample, " features\n")
-    lapply(1:nSamples, function(it) {
-           cat("**Biclustering iteration: ", it, "\n")
-           sampIdx <- sample.int(nrow(exp_mat), size = nRowsSample)
-           abSol <- rep.int(NA, nrow(exp_mat))
-           curSol <- maximizeOneSplit(exp_mat[sampIdx,], lam, lam.lwr = lam.lwr, 
-                                      clustOptions = clustOptions)
-           abSol[sampIdx] <- curSol$ab
-           d <- curSol$d
-           return(list(ab = abSol, d = d, sccaLam = curSol$sccaLam))
-                           })
-}
-
-#' Parallel biclustering with subsampling
-#'
-#' Given a set of features, will find the most "dominant" bicluster. Works in
-#' parallel using library "multicore." To set the number of cores used, set
-#' options(cores = N).
-#'
-#' @param exp_mat matrix with genes on rows and columns defining conditions
-#' @param nSamples integer denoting the number of permutations to perform
-#' @param lam regularization parameter for conditions (maximum number of conditions allows in a bicluster)
-#' @export
-bcSubSamplePar <- function(exp_mat, nSamples = 100, lam, propSample = 0.6, lam.lwr = 3.5,
-                           clustOptions = list())
-{
-    if (propSample > 1 | propSample < 0.01)
-        stop("Invalid range for propSample")
-
-    nRowsSample <- round(propSample * nrow(exp_mat) )
-    if (nRowsSample %% 2)
-        nRowsSample <- nRowsSample + 1
+    apply_fun <- lapply
+    if (parallel)
+        apply_fun <- parallel::mclapply
 
     cat("Sampling ", nRowsSample, " features\n")
-    mclapply(1:nSamples, function(it) {
-             cat("**Biclustering iteration: ", it, "\n")
-             sampIdx <- sample.int(nrow(exp_mat), size = nRowsSample)
-             abSol <- rep.int(NA, nrow(exp_mat))
-             curSol <- maximizeOneSplit(exp_mat[sampIdx,], lam, lam.lwr = lam.lwr, 
-                                        clustOptions = clustOptions)
-             abSol[sampIdx] <- curSol$ab
-             d <- curSol$d
-             return(list(ab = abSol, d = d, sccaLam = curSol$sccaLam))
-                           })
+    apply_fun(1:n_samp, function(it) {
+        cat("**Biclustering iteration: ", it, "\n")
+        sampIdx <- sample.int(nrow(exp_mat), size = nRowsSample)
+        abSol <- rep.int(NA, nrow(exp_mat))
+        curSol <- maximizeOneSplit(exp_mat[sampIdx,], lam, lam.lwr = lam_lwr, 
+            clustOptions = clustOptions)
+        abSol[sampIdx] <- curSol$ab
+        d <- curSol$d
+        list(ab = abSol, d = d, sccaLam = curSol$sccaLam)
+    })
 }
