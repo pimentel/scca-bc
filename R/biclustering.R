@@ -110,7 +110,7 @@ maximizeOneSplit <- function(exp_mat, lam, epsA = 0.001, epsB = 0.001,
 #' @param parallel if TRUE use parallel::mclapply, else use lapply
 #' @param clust_opt a list of additional cluster options
 #' @export
-sccab <- function(exp_mat, nSamples = 100, lam, lam.lwr = 3.5, parallel = FALSE, clustOptions = list())
+sccab <- function(exp_mat, nSamples = 100, lam, lam.lwr = 3.5, parallel = FALSE, clust_opt = list())
 {
     if (!is.matrix(exp_mat))
         stop("biclustering requires a matrix")
@@ -122,7 +122,7 @@ sccab <- function(exp_mat, nSamples = 100, lam, lam.lwr = 3.5, parallel = FALSE,
     apply_fun(1:nSamples, function(it) {
         cat("Biclustering iteration: ", it, "\n")
         maximizeOneSplit(exp_mat, lam = lam, lam.lwr = lam.lwr,
-            clustOptions = clustOptions)
+            clustOptions = clust_opt)
         })
 }
 
@@ -163,7 +163,7 @@ sccab_subsample <- function(exp_mat, n_samp = 100, lam, prop = 0.6, lam_lwr = 3.
         sampIdx <- sample.int(nrow(exp_mat), size = nRowsSample)
         abSol <- rep.int(NA, nrow(exp_mat))
         curSol <- maximizeOneSplit(exp_mat[sampIdx,], lam, lam.lwr = lam_lwr, 
-            clustOptions = clustOptions)
+            clustOptions = clust_opt)
         abSol[sampIdx] <- curSol$ab
         d <- curSol$d
         list(ab = abSol, d = d, sccaLam = curSol$sccaLam)
