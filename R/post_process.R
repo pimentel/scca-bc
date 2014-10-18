@@ -48,8 +48,8 @@ postSubSample.pca <- function(subSampleSol, abThresh = 0.6, dQuant = 0.5)
     if (sum(is.na(ab)) > 0)
         ab <- bootStrapNAs(ab, 0.05, 0.95)
 
-    # pcaAB <- prcomp(ab, center = F, scale. = F)
-    pcaAB <- prcomp(ab)
+    pcaAB <- prcomp(ab, center = F, scale. = F)
+    # pcaAB <- prcomp(ab)
     pcaAB$rotation <- as.data.frame(data.matrix(as.data.frame(pcaAB$rotation, stringsAsFactors = F)))
 
     pcaAB$rotation[,"mean"] <- apply(ab, 2, mean, na.rm = T)
@@ -75,6 +75,9 @@ postSubSample.pca <- function(subSampleSol, abThresh = 0.6, dQuant = 0.5)
     colIdx <- clustKmeans(df2)
     # colIdx <- clustKmeans(cbind(dQuant))
 
+    pcaAB$rotation$cluster <- FALSE
+    pcaAB$rotation$cluster[rowIdx] <- TRUE
+
     pcaD$rotation <- data.frame(pcaD$rotation)
     pcaD$rotation[,"cluster"] <- "background"
     pcaD$rotation[colIdx,"cluster"] <- "bicluster"
@@ -86,8 +89,8 @@ postSubSample.pca <- function(subSampleSol, abThresh = 0.6, dQuant = 0.5)
 
 clustKmeans <- function(dat, minK = 2)
 {
-    gap <- clusGap(as.matrix(dat), kmeans, 5)
-    nk <- maxSE(gap$Tab[,"gap"], gap$Tab[,"SE.sim"])
+    gap <- cluster::clusGap(as.matrix(dat), kmeans, 5)
+    nk <- cluster::maxSE(gap$Tab[,"gap"], gap$Tab[,"SE.sim"])
     if (nk == 1)
         nk <- minK
     cat("Conditions k: ", nk, "\n")
@@ -113,7 +116,21 @@ postSubSample.ranks <- function(subSampleSol)
     ab_features$in_clust <- FALSE
     ab_features$in_clust[rowIdx] <- TRUE
 
-    return(list(ab_rank = ab_rank, rowIdx = rowIdx, ab_features = ab_features))
+
+    d <- getD(subSampleSol)
+    d_rank <- apply(d, 2, rank)
+    pca_d <- prcomp(t(d), center = F, scale. = F)
+
+    d_features <- cbind(-pca_d$rotation[,1] * pca_d$sdev[1],
+        pca_d$rotation[,2] * pca_d$sdev[2])
+    colIdx <- clustKmeans(d_features)
+    d_features <- data.frame(d_features)
+    colnames(d_features) <- c("PC1", "PC2")
+    d_features$in_clust <- FALSE
+    d_features$in_clust[colIdx] <- TRUE
+
+    return(list(ab_rank = ab_rank, rowIdx = rowIdx, ab_features = ab_features,
+            colIdx = colIdx, d_features = d_features))
 }
 
 postSubSample <- function(subSampleSol, percentile = 0.75)
@@ -329,8 +346,8 @@ postSubSample.median.kmeans2 <- function(subSampleSol, abQuant = 0.5, dQuant = 0
 
     clustKmeans <- function(dat, minK = 2)
     {
-        gap <- clusGap(as.matrix(dat), kmeans, 5)
-        nk <- maxSE(gap$Tab[,"gap"], gap$Tab[,"SE.sim"])
+        gap <- cluster::clusGap(as.matrix(dat), kmeans, 5)
+        nk <- cluster::maxSE(gap$Tab[,"gap"], gap$Tab[,"SE.sim"])
         if (nk == 1)
             nk <- minK
         kRes <- kmeans(dat, nk, nstart = 20)
@@ -404,8 +421,8 @@ postSubSample.tight <- function(subSampleSol, abThresh = 0.6, dQuant = 0.5)
 
     clustKmeans <- function(dat, minK = 2)
     {
-        gap <- clusGap(as.matrix(dat), kmeans, 5)
-        nk <- maxSE(gap$Tab[,"gap"], gap$Tab[,"SE.sim"])
+        gap <- cluster::clusGap(as.matrix(dat), kmeans, 5)
+        nk <- cluster::maxSE(gap$Tab[,"gap"], gap$Tab[,"SE.sim"])
         if (nk == 1)
             nk <- minK
         cat("Conditions k: ", nk, "\n")

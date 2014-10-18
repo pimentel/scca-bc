@@ -12,7 +12,7 @@ Imports:
     parallel (>= 3.1.1),
     gplots (>= 2.14.2),
     cluster (>= 1.15.3),
-    fscca
+    fscca (>= 0.1.0)
 LinkingTo: Rcpp
 Suggests:
     testthat

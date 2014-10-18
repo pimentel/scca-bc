@@ -17,7 +17,6 @@ split_evenly <- function(n)
 
 #' Optimizing the biclustering function
 #'
-#'
 #' One iteration of biclustering maximization. Takes the current values of 
 #' d, and if successful returns one iteration.
 #' 
@@ -46,8 +45,8 @@ biClustMax.optim <- function(X, Y, d.start, lam, verbose = TRUE, lam.lwr = 3.5,
 }
 
 ##' Driver function to find solution for 
-maximizeOneSplit <- function(exp_mat, lam, epsA = 0.001, epsB = 0.001, epsD = 0.01, maxIt = 100, lam.lwr, 
-                             clustOptions = list())
+maximizeOneSplit <- function(exp_mat, lam, epsA = 0.001, epsB = 0.001,
+    epsD = 0.01, maxIt = 100, lam.lwr, clustOptions = list())
 {
     splitIdx <- split_evenly(nrow(exp_mat))
     X <- exp_mat[splitIdx[[1]], ]
@@ -69,22 +68,26 @@ maximizeOneSplit <- function(exp_mat, lam, epsA = 0.001, epsB = 0.001, epsD = 0.
             maxUnif <- min(minUnif + 0.01, maxUnif - 0.05)
     }
 
-    # NB: values of a and b are not important currently since evaluated after d is set.
-    # If ever change the order, fix this.
+    # NB: values of a and b are not important currently since evaluated after
+    # d is set.  If ever change the order, fix this.
     a <- b <- runif(nrow(X), min = -1, max = 1)
     it <- 1
     curSol <- list()
     cat(sprintf("% 10s% 7s% 7s\n", "a", "b", "d"))
     repeat {
         # cat("\tOne split iteration: ", it, "\n")
-        curSol <- biClustMax.optim(X, Y, d, lam, lam.lwr = lam.lwr, clustOptions = clustOptions)
+        curSol <- biClustMax.optim(X, Y, d, lam, lam.lwr = lam.lwr,
+            clustOptions = clustOptions)
 
         a_dist <- dist(rbind(curSol$a, a))[1]
         b_dist <- dist(rbind(curSol$b, b))[1]
         # d_dist <- dist(rbind(curSol$d, d))[1]
         d_dist <- mean_absolute_tol(d, curSol$d)
 
-        cat(sprintf("\t%.4f\t%.4f\t%.4f\n", a_dist, b_dist, d_dist))
+        cur_val <- (t(a) %*% (X %*% diag(d))) %*% t(t(b) %*% (Y %*% diag(d)))
+
+        cat(sprintf("\t%.4f\t%.4f\t%.4f\t%.4f\n",
+                a_dist, b_dist, d_dist, cur_val))
 
         if (a_dist < epsA && b_dist < epsB && d_dist < epsD && it >= 3) 
         {
@@ -113,8 +116,7 @@ maximizeOneSplit <- function(exp_mat, lam, epsA = 0.001, epsB = 0.001, epsD = 0.
                 splitIdx = splitIdx, sccaLam = curSol$sccaLam))
 }
 
-
-#' Serial biclustering
+#' Parallel biclustering
 #'
 #' Given a set of features, will find the most "dominant" bicluster. Works in
 #' parallel using library "multicore." To set the number of cores used, set
@@ -158,8 +160,7 @@ biclusteringSerial <- function(exp_mat, nSamples = 100, lam, lam.lwr = 3.5, clus
             })
 }
 
-
-#' Serial biclustering
+#' Serial biclustering with subsampling
 #'
 #' Uses one core to perform SCCAB
 #'
@@ -193,7 +194,8 @@ bcSubSampleSerial <- function(exp_mat, nSamples = 100, lam, propSample = 0.6, la
                            })
 }
 
-
+#' Parallel biclustering with subsampling
+#'
 #' Given a set of features, will find the most "dominant" bicluster. Works in
 #' parallel using library "multicore." To set the number of cores used, set
 #' options(cores = N).
