@@ -46,6 +46,18 @@ test_that("Maximize",
 
 context("Misc supp functions")
 
+test_that("Detect d maximizer",
+    {
+        expect_equal(detect_d_maximizer("lasso"), lasso_max_d)
+        expect_equal(detect_d_maximizer("timeseries"), timeseries_max_d)
+
+        expect_equal(detect_d_maximizer(lasso_max_d), lasso_max_d)
+        expect_equal(detect_d_maximizer(timeseries_max_d), timeseries_max_d)
+
+        expect_error(detect_d_maximizer("lasso1"))
+        expect_error(detect_d_maximizer("lass"))
+    })
+
 test_that("Distances in vectors",
     {
         a <- c(1, 1, 1, 1)
