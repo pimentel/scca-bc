@@ -36,11 +36,22 @@ test_that("Correct dimension",
         expect_equal(length(res$b), n)
     })
 
+context("Timeseries max d")
+test_that("Maximize",
+    {
+        q <- c(0, 0, 1, 0, 1, 1, 1, 0, 0, 0, 0)
+        d <- .timeseries_max_d(q, 3)
+        expect_equal(d, c(rep(0, 4), rep(1, 3), rep(0, 4)))
+    })
+
 context("Misc supp functions")
 
 test_that("Distances in vectors",
     {
-        cat(mean_relative_tol(c(1, 1, 1, 1), c(1, 0.8, 1, 1)), fill = T)
-        cat(mean_absolute_tol(c(1, 1, 1, 1), c(1, 0.8, 1, 1)), fill = T)
-        cat(p_diff(c(1, 1, 1, 1), c(1, 0.8, 1, 1)), fill = T)
+        a <- c(1, 1, 1, 1)
+        b <- c(1, 0.8, 1, 1)
+        expect_equal(mean_relative_tol(a, b), 0.05, tolerance = 0.001)
+
+        expect_equal(mean_absolute_tol(a, b), 0.05, tolerance = 0.001)
     })
+

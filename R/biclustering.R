@@ -146,6 +146,9 @@ sccab_subsample <- function(exp_mat, n_samp = 100, lam, prop = 0.6, lam_lwr = 3.
     if (!is.matrix(exp_mat))
         stop("biclustering requires a matrix")
 
+    if (prop == 1.0)
+        stop("For prop == 1, use sccab")
+
     if (prop > 1 | prop < 0.01)
         stop("Invalid range for prop")
 
@@ -166,6 +169,7 @@ sccab_subsample <- function(exp_mat, n_samp = 100, lam, prop = 0.6, lam_lwr = 3.
             clustOptions = clust_opt)
         abSol[sampIdx] <- curSol$ab
         d <- curSol$d
+
         list(ab = abSol, d = d, sccaLam = curSol$sccaLam)
     })
 }

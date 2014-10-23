@@ -25,7 +25,6 @@ lasso_max_d <- function(X, Y, a, b, s)
 .lasso_max_d <- function(q, s)
 {
     # XXX: Not checking if s > 0... a program above should check
-
     d <- rep.int(0, length(q))
 
     n_gt0 <- length(which(q > 0))
@@ -50,6 +49,40 @@ lasso_max_d <- function(X, Y, a, b, s)
             break
         }
     }
+
+    d
+}
+
+#' @export
+timeseries_max_d <- function(X, Y, a, b, s)
+{
+    # consider taking only integer values for s
+    Xs <- scale(X)
+    Ys <- scale(Y)
+    aX <- a %*% Xs
+    bY <- b %*% Ys
+
+    q <- (a %*% Xs) * (b %*% Ys)
+
+    .timeseries_max_d(q, s)
+}
+
+.timeseries_max_d <- function(q, s)
+{
+    n_win <- length(q) - s + 1
+    w <- rep(0, n_win)
+
+    e_i <- s + 1
+    w[1] <- sum(q[1:s])
+    for (i in 2:n_win)
+    {
+        w[i] <- w[i-1] + q[e_i] - q[i-1]
+        e_i <- e_i + 1
+    }
+
+    i_start <- which.max(w)
+    d <- rep(0, length(q))
+    d[i_start:(i_start+s-1)] <- 1
 
     d
 }
