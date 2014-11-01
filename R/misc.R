@@ -1,8 +1,23 @@
+check_lams <- function(lam_lwr, lam_upr, n_cols)
+{
+    cur_values <- sprintf("Current values: (%.4f, %.4f)", lam_lwr, lam_upr)
+
+    if (lam_lwr < 0)
+        stop(sprintf("lam_lwr must be >= 0. %s", cur_values))
+
+    if (!(lam_lwr - 1 <= lam_upr))
+        stop(sprintf("lam_upr must be greater than or equal to lam_lwr - 1.
+                %s", cur_values))
+
+    if (lam_upr >= n_cols)
+        warning("lam_upr is >= n_cols.")
+}
+
 #' Randomly split a set of indices
 #'
 #' Randomly splits indices if there are an even number. If there is an odd
 #' number, it will stop().
-#' 
+#'
 #' @param n the number of indices
 #' @return a list with two disjoint sets of indices from 1 to n.
 split_evenly <- function(n)
@@ -58,10 +73,9 @@ jaccard_idx_matrix <- function(truthList, predList)
                max(sapply(predList, function(prediction)
                       {
                           predCat <- expandCells(prediction)
-                          numerator <- length(intersect(truthCat, predCat)) 
+                          numerator <- length(intersect(truthCat, predCat))
                           denominator <- length(union(truthCat, predCat))
                           numerator / denominator
                       }))
            }))
 }
-

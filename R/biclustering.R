@@ -103,25 +103,27 @@ maximizeOneSplit <- function(exp_mat, lam, epsA = 0.001, epsB = 0.001,
 #' options(cores = N).
 #'
 #' @param exp_mat matrix with features on rows and conditions on columns
-#' @param nSamples integer denoting the number of permutations to perform
-#' @param parallel if TRUE, use parallel::mclapply instead of lapply
-#' @param lam regularization parameter for conditions (maximum number of conditions allows in a bicluster)
+#' @param lam_upr regularization parameter for conditions (maximum number of conditions allows in a bicluster)
+#' @param n_samples integer denoting the number of permutations to perform
 #' @param lam_lwr the lower boundary lambda (minimum number of conditions)
+#' @param parallel if TRUE, use parallel::mclapply instead of lapply
 #' @param parallel if TRUE use parallel::mclapply, else use lapply
 #' @param clust_opt a list of additional cluster options
 #' @export
-sccab <- function(exp_mat, nSamples = 100, lam, lam.lwr = 3.5, parallel = FALSE, clust_opt = list())
+sccab <- function(exp_mat, lam_upr, n_samples = 100, lam_lwr = 3.5, parallel = FALSE, clust_opt = list())
 {
     if (!is.matrix(exp_mat))
         stop("biclustering requires a matrix")
+
+    check_lams(lam_lwr, lam_upr, ncol(exp_mat))
 
     apply_fun <- lapply
     if (parallel)
         apply_fun <- parallel::mclapply
 
-    apply_fun(1:nSamples, function(it) {
+    apply_fun(1:n_samples, function(it) {
         cat("Biclustering iteration: ", it, "\n")
-        maximizeOneSplit(exp_mat, lam = lam, lam.lwr = lam.lwr,
+        maximizeOneSplit(exp_mat, lam = lam, lam.lwr = lam_lwr,
             clustOptions = clust_opt)
         })
 }

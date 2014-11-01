@@ -13,7 +13,7 @@ bcMultipleClusters <- function(geneDf, lam, nClusters, nSamples = 100)
         D <- sapply(bcSol, function(x) x$d)
 
         # find features/conditions which are clustered
-        # to find the cluster, find cut with fewest elements...  
+        # to find the cluster, find cut with fewest elements...
 
         # XXX: this is not necessarily correct. For example, it is *possible*
         # that a cluster might contain more than half of the genes and only
@@ -35,7 +35,7 @@ bcMultipleClusters <- function(geneDf, lam, nClusters, nSamples = 100)
             # cutIdx <- which(hcCuts == cutIdx)
 
             cutIdx <- 1
-            if (mean(mat[which(hcCuts == 1), ]) < 
+            if (mean(mat[which(hcCuts == 1), ]) <
                 mean(mat[which(hcCuts == 2), ]))
             {
                 cutIdx <- 2
@@ -52,7 +52,7 @@ bcMultipleClusters <- function(geneDf, lam, nClusters, nSamples = 100)
 
         # given a list of rows and columns, converts pairwise combinations into
         # 1D index for matrix
-        get1DIdx <- function(rows, cols) 
+        get1DIdx <- function(rows, cols)
         {
             allPairs <- expand.grid(rows, cols)
             nrow(geneDf) * (allPairs[, 2] - 1) + allPairs[, 1]
@@ -86,7 +86,7 @@ bcMultipleClusters.kmeans <- function(geneDf, lam, nClusters, nSamples = 100)
         D <- sapply(bcSol, function(x) x$d)
 
         # find features/conditions which are clustered
-        # to find the cluster, find cut with fewest elements...  
+        # to find the cluster, find cut with fewest elements...
 
         # XXX: this is not necessarily correct. For example, it is *possible*
         # that a cluster might contain more than half of the genes and only
@@ -100,7 +100,7 @@ bcMultipleClusters.kmeans <- function(geneDf, lam, nClusters, nSamples = 100)
             cuts <- kmeans(mat, 2)$cluster
 
             cutIdx <- 1
-            if (mean(mat[which(cuts == 1), ]) < 
+            if (mean(mat[which(cuts == 1), ]) <
                 mean(mat[which(cuts == 2), ]))
             {
                 cutIdx <- 2
@@ -117,7 +117,7 @@ bcMultipleClusters.kmeans <- function(geneDf, lam, nClusters, nSamples = 100)
 
         # given a list of rows and columns, converts pairwise combinations into
         # 1D index for matrix
-        get1DIdx <- function(rows, cols) 
+        get1DIdx <- function(rows, cols)
         {
             allPairs <- expand.grid(rows, cols)
             nrow(geneDf) * (allPairs[, 2] - 1) + allPairs[, 1]

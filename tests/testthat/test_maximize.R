@@ -39,7 +39,7 @@ test_that("Correct dimension",
 context("Timeseries max d")
 test_that("Maximize",
     {
-        q <- c(0, 0, 1, 0, 1, 1, 1, 0, 0, 0, 0)
+        q <- c(0, 0, 1, 0, 1, 1, 1, 0, 0, 0, 1)
         d <- .timeseries_max_d(q, 3)
         expect_equal(d, c(rep(0, 4), rep(1, 3), rep(0, 4)))
     })

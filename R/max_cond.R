@@ -92,7 +92,7 @@ timeseries_max_d <- function(X, Y, a, b, s)
 .timeseries_max_d <- function(q, s)
 {
     n_win <- length(q) - s + 1
-    w <- rep(0, n_win)
+    w <- rep.int(-1, n_win)
 
     e_i <- s + 1
     w[1] <- sum(q[1:s])
@@ -103,7 +103,7 @@ timeseries_max_d <- function(X, Y, a, b, s)
     }
 
     i_start <- which.max(w)
-    d <- rep(0, length(q))
+    d <- rep.int(0, length(q))
     d[i_start:(i_start+s-1)] <- 1
 
     d
