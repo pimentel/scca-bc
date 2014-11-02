@@ -103,12 +103,12 @@ max_one_split <- function(exp_mat, params, epsA = 0.001, epsB = 0.001,
 #' SCCAB(iclustering) (with all data)
 #'
 #' Given a set of features, will find the most "dominant" bicluster. Works in
-#' parallel using library "multicore." To set the number of cores used, set
-#' options(cores = N).
+#' parallel using library \code{\link[multicore]{multicore}}. To set the number of cores
+#' used, set \code{options(cores = N)}.
 #'
 #' @param exp_mat matrix with features on rows and conditions on columns
-#' @param params a sccab_params object from sccab_params()
-#' @return a sccab_res object
+#' @param params a \code{sccab_params} object from \code{sccab_params()}
+#' @return a \code{sccab_res} object
 #' @export
 sccab <- function(exp_mat, params)
 {
