@@ -38,17 +38,22 @@ maximizeOneSplit <- function(exp_mat, lam, epsA = 0.001, epsB = 0.001,
     # FIXME: If there are lots of conditions, possible that won't be able to
     # find d that satisfy the constraint (if lam is sufficiently small. Come up
     # with different way to randomly assign values
-    d <- 0
-    minUnif <- 0.05
-    maxUnif <- 1
+    # d <- 0
+    # minUnif <- 0.05
+    # maxUnif <- 1
 
-    repeat {
-        d <- runif(ncol(X), max = maxUnif)
-        if (sum(d) <= lam)
-            break
-        else
-            maxUnif <- min(minUnif + 0.01, maxUnif - 0.05)
-    }
+    # the first iteration, simply compute SCCA and get the highest ranked
+    # conditions
+
+    d <- rep.int(1, ncol(X))
+
+    # repeat {
+    #     d <- runif(ncol(X), max = maxUnif)
+    #     if (sum(d) <= lam)
+    #         break
+    #     else
+    #         maxUnif <- min(minUnif + 0.01, maxUnif - 0.05)
+    # }
 
     # NB: values of a and b are not important currently since evaluated after
     # d is set.  If ever change the order, fix this.
@@ -80,6 +85,7 @@ maximizeOneSplit <- function(exp_mat, lam, epsA = 0.001, epsB = 0.001,
         a <- curSol$a
         b <- curSol$b
         d <- curSol$d
+
         it <- it + 1
         if (it > maxIt)
         {
