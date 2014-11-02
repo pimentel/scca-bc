@@ -115,7 +115,7 @@ sccab <- function(exp_mat, lam_upr, n_samples = 100, lam_lwr = 3.5,
     parallel = FALSE, clust_opt = list())
 {
     if (!is.matrix(exp_mat))
-        stop("biclustering requires a matrix")
+        stop("sccab requires a matrix")
 
     check_lams(lam_lwr, lam_upr, ncol(exp_mat))
 
@@ -137,24 +137,26 @@ sccab <- function(exp_mat, lam_upr, n_samples = 100, lam_lwr = 3.5,
 #' options(mc.cores = N).
 #'
 #' @param exp_mat matrix with features on rows and conditions on columns
+#' @param lam_upr regularization parameter for conditions (maximum number of conditions allows in a bicluster)
 #' @param n_samp integer denoting the number of permutations to perform
-#' @param lam regularization parameter for conditions (maximum number of conditions allows in a bicluster)
 #' @param prop Proportion to subsample
 #' @param lam_lwr the lower boundary lambda (minimum number of conditions)
 #' @param parallel if TRUE use parallel::mclapply, else use lapply
 #' @param clust_opt a list of additional cluster options
 #' @export
-sccab_subsample <- function(exp_mat, n_samp = 100, lam, prop = 0.6, lam_lwr = 3.5,
-    parallel = FALSE, clust_opt = list())
+sccab_subsample <- function(exp_mat, lam_upr, n_samp = 100, prop = 0.6,
+    lam_lwr = 3.5, parallel = FALSE, clust_opt = list())
 {
     if (!is.matrix(exp_mat))
-        stop("biclustering requires a matrix")
+        stop("sccab requires a matrix")
 
     if (prop == 1.0)
         stop("For prop == 1, use sccab")
 
     if (prop > 1 | prop < 0.01)
         stop("Invalid range for prop")
+
+    check_lams(lam_lwr, lam_upr, ncol(exp_mat))
 
     nRowsSample <- round(prop * nrow(exp_mat))
     if (nRowsSample %% 2)
@@ -169,7 +171,7 @@ sccab_subsample <- function(exp_mat, n_samp = 100, lam, prop = 0.6, lam_lwr = 3.
         cat("**Biclustering iteration: ", it, "\n")
         sampIdx <- sample.int(nrow(exp_mat), size = nRowsSample)
         abSol <- rep.int(NA, nrow(exp_mat))
-        curSol <- maximizeOneSplit(exp_mat[sampIdx,], lam, lam.lwr = lam_lwr,
+        curSol <- maximizeOneSplit(exp_mat[sampIdx,], lam_upr, lam.lwr = lam_lwr,
             clustOptions = clust_opt)
         abSol[sampIdx] <- curSol$ab
         d <- curSol$d

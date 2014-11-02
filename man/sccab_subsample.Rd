@@ -3,15 +3,15 @@
 \alias{sccab_subsample}
 \title{SCCAB(iclustering) with subsampling}
 \usage{
-sccab_subsample(exp_mat, n_samp = 100, lam, prop = 0.6, lam_lwr = 3.5,
+sccab_subsample(exp_mat, lam_upr, n_samp = 100, prop = 0.6, lam_lwr = 3.5,
   parallel = FALSE, clust_opt = list())
 }
 \arguments{
 \item{exp_mat}{matrix with features on rows and conditions on columns}
 
-\item{n_samp}{integer denoting the number of permutations to perform}
+\item{lam_upr}{regularization parameter for conditions (maximum number of conditions allows in a bicluster)}
 
-\item{lam}{regularization parameter for conditions (maximum number of conditions allows in a bicluster)}
+\item{n_samp}{integer denoting the number of permutations to perform}
 
 \item{prop}{Proportion to subsample}
 
