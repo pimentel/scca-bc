@@ -1,3 +1,41 @@
+bootStrapNAs <- function(dat, lwr, upr)
+{
+    for (icol in 1:ncol(dat))
+    {
+        rng <- quantile(dat[,icol], probs = c(lwr, upr), na.rm = T)
+        # FIXME: why is this not matching at least some things?
+        whichValid <- which( (rng[1] <= dat[,icol]) & (dat[,icol] <= rng[2]))
+        nNa <- sum(is.na(dat[,icol]))
+        if (length(whichValid) == 0)
+        {
+            # cat("len == 0", icol, "\n")
+            # print(sum(!is.na(dat[,icol])))
+            whichValid <- which(!is.na(dat[,icol]))
+            # print(whichValid)
+            # print("----")
+        }
+        samps <- NA
+        if (length(whichValid) == 1)
+            samps <- rep.int(whichValid, nNa)
+        else
+            samps <- sample(whichValid, nNa, replace = T)
+
+        dat[is.na(dat[,icol]), icol] <- dat[samps,icol]
+        # if (any(is.na(dat[,icol])))
+        # {
+        #     cat("samples:", icol, "\n")
+        #     print(dat[samps,icol])
+        #     print("whichValid values:")
+        #     print(dat[whichValid,icol])
+        #     print("whichValid:")
+        #     print(length(whichValid))
+        #     print(whichValid)
+        # }
+    }
+
+    return(dat)
+}
+
 # XXX: This is the best performing method
 #' @export
 postSubSample.pca <- function(subSampleSol, abThresh = 0.6, dQuant = 0.5)
@@ -7,43 +45,6 @@ postSubSample.pca <- function(subSampleSol, abThresh = 0.6, dQuant = 0.5)
     ab <- t(sapply(subSampleSol, function (x) abs(x$ab)))
     d <- t(sapply(subSampleSol, function (x) x$d))
 
-    bootStrapNAs <- function(dat, lwr, upr)
-    {
-        for (icol in 1:ncol(dat))
-        {
-            rng <- quantile(dat[,icol], probs = c(lwr, upr), na.rm = T)
-            # FIXME: why is this not matching at least some things?
-            whichValid <- which( (rng[1] <= dat[,icol]) & (dat[,icol] <= rng[2]))
-            nNa <- sum(is.na(dat[,icol]))
-            if (length(whichValid) == 0)
-            {
-                # cat("len == 0", icol, "\n")
-                # print(sum(!is.na(dat[,icol])))
-                whichValid <- which(!is.na(dat[,icol]))
-                # print(whichValid)
-                # print("----")
-            }
-            samps <- NA
-            if (length(whichValid) == 1)
-                samps <- rep.int(whichValid, nNa)
-            else
-                samps <- sample(whichValid, nNa, replace = T)
-
-            dat[is.na(dat[,icol]), icol] <- dat[samps,icol]
-            # if (any(is.na(dat[,icol])))
-            # {
-            #     cat("samples:", icol, "\n")
-            #     print(dat[samps,icol])
-            #     print("whichValid values:")
-            #     print(dat[whichValid,icol])
-            #     print("whichValid:")
-            #     print(length(whichValid))
-            #     print(whichValid)
-            # }
-        }
-
-        return(dat)
-    }
 
     if (sum(is.na(ab)) > 0)
         ab <- bootStrapNAs(ab, 0.05, 0.95)
@@ -87,6 +88,40 @@ postSubSample.pca <- function(subSampleSol, abThresh = 0.6, dQuant = 0.5)
     # return(list(rowIdx = rowIdx, colIdx = colIdx))
 }
 
+#' @export
+post_hclust <- function(subSampleSol)
+{
+    A <- getA(subSampleSol)
+    D <- getD(subSampleSol)
+
+    cutHCluster <- function(mat)
+    {
+        hc <- hclust(dist(mat))
+        hcCuts <- cutree(hc, 2)
+
+        # cutIdx <- 1
+        # if (mean(hcCuts == 1) > 0.5)
+        # {
+        #     cutIdx <- 2
+        # }
+        # cutIdx <- which(hcCuts == cutIdx)
+
+        cutIdx <- 1
+        if (mean(mat[which(hcCuts == 1), ]) <
+            mean(mat[which(hcCuts == 2), ]))
+        {
+            cutIdx <- 2
+        }
+        cutIdx <- which(hcCuts == cutIdx)
+
+        return(cutIdx)
+    }
+
+    rowIdx <- cutHCluster(A)
+    colIdx <- cutHCluster(D)
+
+    return(list(rowIdx = rowIdx, colIdx = colIdx))
+}
 clustKmeans <- function(dat, minK = 2)
 {
     gap <- cluster::clusGap(as.matrix(dat), kmeans, 5)
@@ -256,7 +291,7 @@ postSubSample.top <- function(subSampleSol, percentile1 = 0.95, eps1 = 0.5,
                   row >= quantile(row, probs = percentile1, na.rm = TRUE)
                                })
     rowIdx <- which(apply(abGt, 1, mean, na.rm = T) >= eps1)
-    
+
     dMean <- apply(d, 1, mean)
     colIdx <- order(dMean, decreasing = T)[1:nc]
 
@@ -563,17 +598,16 @@ postSubSample.mean.kmeans <- function(subSampleSol, abQuant = 0.5, dQuant = 0.5,
 }
 
 
-
 post.hclust <- function(postSample, nAB = 3, nD = 2)
 {
     clustAB <- cutree(hclust(dist(postSample$ab)), nAB)
-    clustABCenter <- sapply(unique(clustAB), 
+    clustABCenter <- sapply(unique(clustAB),
                             function(it) median(postSample$ab[which(clustAB == it)]))
     clustABMax <- which.max(clustABCenter)
     rowIdx <- which(clustAB == clustABMax)
 
     clustD <- cutree(hclust(dist(postSample$d)), nD)
-    clustDCenter <- sapply(unique(clustD), 
+    clustDCenter <- sapply(unique(clustD),
                            function(it) median(postSample$d[which(clustD == it)]))
     clustDMax <- which.max(clustDCenter)
     colIdx <- which(clustD == clustDMax)
@@ -591,42 +625,4 @@ post.kmeans <- function(postSample, nAB = 3, nD = 2)
     colIdx <- which(clustD$cluster == clustDMax)
 
     list(list(rowIdx = rowIdx, colIdx = colIdx))
-}
-
-
-bcMultipleClusters.subSample <- function(geneDf, lam, nClusters, nSamples = 100, 
-                                         propSample = 0.6)
-{
-    allBcSol <- list()
-    clusters <- list()
-    for (clust in 1:nClusters)
-    {
-        bcSol <- bcSubSamplePar(geneDf, nSamples, lam, propSample)
-        allBcSol <- append(allBcSol, list(bcSol))
-
-        postSol <- postSubSample.percent(bcSol, 0.9, 0.5)
-
-        rowIdx <- postSol$rowIdx
-        colIdx <- postSol$colIdx
-
-        clusters <- append(clusters, list(list(rowIdx = rowIdx, colIdx = colIdx)))
-
-        # given a list of rows and columns, converts pairwise combinations into
-        # 1D index for matrix
-        get1DIdx <- function(rows, cols) 
-        {
-            allPairs <- expand.grid(rows, cols)
-            nrow(geneDf) * (allPairs[, 2] - 1) + allPairs[, 1]
-        }
-
-        # mask each gene with random values from the rest of the matrix also
-        # considered doing this with JUST the other values of the gene... need
-        # to experiment with that
-        clustIdx <- get1DIdx(rowIdx, colIdx)
-        geneDf[clustIdx] <- sample(geneDf[-clustIdx], length(clustIdx))
-        # temporarily sample rnorm to debug FP issue
-        # geneDf[clustIdx] <- rnorm(length(clustIdx))
-    }
-
-    return(list(allBcSol = allBcSol, clusters = clusters))
 }

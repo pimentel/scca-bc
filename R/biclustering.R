@@ -21,6 +21,8 @@ biClustMax.optim <- function(X, Y, d.start, lam, verbose = TRUE, lam.lwr = 3.5,
 
     d_optim <- lasso_max_d(X, Y, res$a, res$b, lam)
 
+    # print(res$lambda)
+
     list(a = res$a, b = res$b, d = d_optim, q, sccaLam = res$lambda)
 }
 
@@ -107,7 +109,6 @@ maximizeOneSplit <- function(exp_mat, lam, epsA = 0.001, epsB = 0.001,
 #' @param n_samples integer denoting the number of permutations to perform
 #' @param lam_lwr the lower boundary lambda (minimum number of conditions)
 #' @param parallel if TRUE, use parallel::mclapply instead of lapply
-#' @param parallel if TRUE use parallel::mclapply, else use lapply
 #' @param clust_opt a list of additional cluster options
 #' @export
 sccab <- function(exp_mat, lam_upr, n_samples = 100, lam_lwr = 3.5,
@@ -124,7 +125,7 @@ sccab <- function(exp_mat, lam_upr, n_samples = 100, lam_lwr = 3.5,
 
     apply_fun(1:n_samples, function(it) {
         cat("Biclustering iteration: ", it, "\n")
-        maximizeOneSplit(exp_mat, lam = lam, lam.lwr = lam_lwr,
+        maximizeOneSplit(exp_mat, lam = lam_upr, lam.lwr = lam_lwr,
             clustOptions = clust_opt)
         })
 }

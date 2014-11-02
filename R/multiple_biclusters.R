@@ -134,3 +134,40 @@ bcMultipleClusters.kmeans <- function(geneDf, lam, nClusters, nSamples = 100)
 
     return(list(allBcSol = allBcSol, clusters = clusters))
 }
+
+bcMultipleClusters.subSample <- function(geneDf, lam, nClusters, nSamples = 100,
+                                         propSample = 0.6)
+{
+    allBcSol <- list()
+    clusters <- list()
+    for (clust in 1:nClusters)
+    {
+        bcSol <- bcSubSamplePar(geneDf, nSamples, lam, propSample)
+        allBcSol <- append(allBcSol, list(bcSol))
+
+        postSol <- postSubSample.percent(bcSol, 0.9, 0.5)
+
+        rowIdx <- postSol$rowIdx
+        colIdx <- postSol$colIdx
+
+        clusters <- append(clusters, list(list(rowIdx = rowIdx, colIdx = colIdx)))
+
+        # given a list of rows and columns, converts pairwise combinations into
+        # 1D index for matrix
+        get1DIdx <- function(rows, cols)
+        {
+            allPairs <- expand.grid(rows, cols)
+            nrow(geneDf) * (allPairs[, 2] - 1) + allPairs[, 1]
+        }
+
+        # mask each gene with random values from the rest of the matrix also
+        # considered doing this with JUST the other values of the gene... need
+        # to experiment with that
+        clustIdx <- get1DIdx(rowIdx, colIdx)
+        geneDf[clustIdx] <- sample(geneDf[-clustIdx], length(clustIdx))
+        # temporarily sample rnorm to debug FP issue
+        # geneDf[clustIdx] <- rnorm(length(clustIdx))
+    }
+
+    return(list(allBcSol = allBcSol, clusters = clusters))
+}

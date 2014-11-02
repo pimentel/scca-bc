@@ -15,22 +15,34 @@ a <- postSubSample.pca(res)
 load("~/Dropbox/biclustering/R/sim50Mvn.sol.RData", verbose = T)
 
 data <- sim50Mvn.sol$data[[1]]$mat
-res <- biclusteringSerial(data, 50, 30)
+res <- sccab(data, 30, 50, clust_opt = list(lamx = c(1, 10, 20)))
+
+res2 <- sccab(data, 30, 50, clust_opt = list(lamx = c(1, 2, 3)))
 
 x <- ggPlotSSSolution(res)
 
 debugonce(postSubSample.pca)
 a <- postSubSample.pca(res)
+a2 <- postSubSample.pca(res2)
 
 debugonce(postSubSample.ranks)
 r <- postSubSample.ranks(res)
+r2 <- postSubSample.ranks(res2)
+
+h <- post_hclust(res)
+h2 <- post_hclust(res2)
 
 boxplot(r)
 ggplot(data.frame(x = 1:1500, y = apply(r, 1, median)), aes(x, y)) + geom_point()
 
 jaccard_idx_matrix(list(r), list(list(rowIdx = 1:300, colIdx = 1:30)))
+jaccard_idx_matrix(list(r2), list(list(rowIdx = 1:300, colIdx = 1:30)))
+
+jaccard_idx_matrix(list(h), list(list(rowIdx = 1:300, colIdx = 1:30)))
+jaccard_idx_matrix(list(h2), list(list(rowIdx = 1:300, colIdx = 1:30)))
 
 jaccard_idx_matrix(list(a), list(list(rowIdx = 1:300, colIdx = 1:30)))
+jaccard_idx_matrix(list(a2), list(list(rowIdx = 1:300, colIdx = 1:30)))
 
 jaccard_idx_matrix(sim50Mvn.sol$sol[[1]]$clusters, list(list(rowIdx = 1:300, colIdx = 1:30)))
 

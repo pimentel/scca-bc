@@ -14,6 +14,7 @@ features_max_fscca <- function(X, Y, d, lam_a, lam_b)
     xTilde <- t(X %*% diag(d))
     yTilde <- t(Y %*% diag(d))
 
+    # capture.output(res <- fscca::fscca(xTilde, yTilde, "lasso", "lasso", lam_a, lam_b))
     capture.output(res <- fscca::fscca(xTilde, yTilde, "lasso", "lasso", lam_a, lam_b))
 
     return(list(a = res$A[,1], b = res$B[,1], lambda = res$lambda))
