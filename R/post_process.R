@@ -28,7 +28,7 @@ postSubSample.pca <- function(subSampleSol, abThresh = 0.6, dQuant = 0.5)
                 samps <- rep.int(whichValid, nNa)
             else
                 samps <- sample(whichValid, nNa, replace = T)
-                
+
             dat[is.na(dat[,icol]), icol] <- dat[samps,icol]
             # if (any(is.na(dat[,icol])))
             # {
@@ -66,7 +66,7 @@ postSubSample.pca <- function(subSampleSol, abThresh = 0.6, dQuant = 0.5)
     # colIdx <- clustKmeans(cbind(dQuant, dSd))
     # rowIdx <- clustKmeans(with(pcaAB$rotation, cbind(-PC1 * sdev[1], PC2 * sdev[2])))
 
-    df <- cbind(-pcaAB$rotation$PC1 * pcaAB$sdev[1], 
+    df <- cbind(-pcaAB$rotation$PC1 * pcaAB$sdev[1],
                                 pcaAB$rotation$PC2 * pcaAB$sdev[2])
     rowIdx <- clustKmeans(df)
     df2 <- cbind(-pcaD$rotation[,"PC1"] * pcaD$sdev[1],
@@ -143,7 +143,7 @@ postSubSample <- function(subSampleSol, percentile = 0.75)
                   mean(col, na.rm = TRUE)
                   # quantile(col, probs = percentile, na.rm = TRUE)
             })
-    dGt <- apply(d, 2, function(col) 
+    dGt <- apply(d, 2, function(col)
                   {
                       median(col, na.rm = TRUE)
                   })
@@ -162,21 +162,20 @@ postSubSample.percent <- function(subSampleSol, percentile = 0.95, eps = 0.05)
                   row >= quantile(row, probs = percentile, na.rm = TRUE)
             })
     rowIdx <- which(apply(abGt, 1, mean, na.rm = T) >= eps)
-    # dGt <- apply(d, 1, function(row) 
+    # dGt <- apply(d, 1, function(row)
     #               {
     #                   row >= quantile(row, probs = percentile, na.rm = TRUE)
     #               })
     # dGt <- t(dGt)
     # colIdx <- which(apply(d, 1, mean, na.rm = T) >= eps)
 
-    
     cutHCluster <- function(mat)
     {
         hc <- hclust(dist(mat))
         hcCuts <- cutree(hc, 2)
 
         cutIdx <- 1
-        if (mean(mat[which(hcCuts == 1), ]) < 
+        if (mean(mat[which(hcCuts == 1), ]) <
             mean(mat[which(hcCuts == 2), ]))
         {
             cutIdx <- 2
@@ -205,7 +204,6 @@ postSubSample.percent2 <- function(subSampleSol, percentile1 = 0.95, eps1 = 0.5,
             })
     rowIdx <- which(apply(abGt, 1, mean, na.rm = T) >= eps1)
 
-    
     dGt <- apply(d, 1, function(row) {
                  row >= quantile(row, probs = percentile2, na.rm = T)
             })
@@ -225,7 +223,7 @@ postSubSample.sort <- function(subSampleSol, percentile1 = 0.95, eps1 = 0.5,
                   row >= quantile(row, probs = percentile1, na.rm = TRUE)
                                })
     rowIdx <- which(apply(abGt, 1, mean, na.rm = T) >= eps1)
-    
+
     dSort <- t(apply(d, 2, function(col) {sort(col)}))
     cutHCluster <- function(mat)
     {
@@ -233,7 +231,7 @@ postSubSample.sort <- function(subSampleSol, percentile1 = 0.95, eps1 = 0.5,
         hcCuts <- cutree(hc, 2)
 
         cutIdx <- 1
-        if (mean(mat[which(hcCuts == 1), ]) < 
+        if (mean(mat[which(hcCuts == 1), ]) <
             mean(mat[which(hcCuts == 2), ]))
         {
             cutIdx <- 2
@@ -312,9 +310,9 @@ postSubSample.median.kmeans <- function(subSampleSol, abQuant = 0.5, dQuant = 0.
 }
 
 
-# credit to stackoverflow: 
+# credit to stackoverflow:
 # http://stackoverflow.com/questions/2547402/standard-library-function-in-r-for-finding-the-mode
-findMode <- function(x, na.rm = T) 
+findMode <- function(x, na.rm = T)
 {
     if (na.rm)
         x <- x[!is.na(x)]

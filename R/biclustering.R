@@ -1,8 +1,8 @@
 #' Optimizing the biclustering function
 #'
-#' One iteration of biclustering maximization. Takes the current values of 
+#' One iteration of biclustering maximization. Takes the current values of
 #' d, and if successful returns one iteration.
-#' 
+#'
 #' @param X matrix with rows representing genes and columns representing conditions (n x k)
 #' @param Y matrix with rows representing genes and columns representing conditions (n x k)
 #' @param d.start vector of dimension k
@@ -40,7 +40,7 @@ maximizeOneSplit <- function(exp_mat, lam, epsA = 0.001, epsB = 0.001,
     minUnif <- 0.05
     maxUnif <- 1
 
-    repeat { 
+    repeat {
         d <- runif(ncol(X), max = maxUnif)
         if (sum(d) <= lam)
             break
@@ -69,7 +69,7 @@ maximizeOneSplit <- function(exp_mat, lam, epsA = 0.001, epsB = 0.001,
         cat(sprintf("\t%.4f\t%.4f\t%.4f\t%.4f\n",
                 a_dist, b_dist, d_dist, cur_val))
 
-        if (a_dist < epsA && b_dist < epsB && d_dist < epsD && it >= 3) 
+        if (a_dist < epsA && b_dist < epsB && d_dist < epsD && it >= 3)
         {
             cat("\tConverged. Number of iterations: ", it, "\n")
             break
@@ -86,7 +86,7 @@ maximizeOneSplit <- function(exp_mat, lam, epsA = 0.001, epsB = 0.001,
         }
     }
 
-    # NB: If there is something funky with the distribution of a and b, 
+    # NB: If there is something funky with the distribution of a and b,
     # check here... though this should work correctly
     ab <- rep.int(0, length(b)*2)
     ab[splitIdx[[1]]] <- curSol$a
@@ -110,7 +110,8 @@ maximizeOneSplit <- function(exp_mat, lam, epsA = 0.001, epsB = 0.001,
 #' @param parallel if TRUE use parallel::mclapply, else use lapply
 #' @param clust_opt a list of additional cluster options
 #' @export
-sccab <- function(exp_mat, lam_upr, n_samples = 100, lam_lwr = 3.5, parallel = FALSE, clust_opt = list())
+sccab <- function(exp_mat, lam_upr, n_samples = 100, lam_lwr = 3.5,
+    parallel = FALSE, clust_opt = list())
 {
     if (!is.matrix(exp_mat))
         stop("biclustering requires a matrix")
@@ -167,7 +168,7 @@ sccab_subsample <- function(exp_mat, n_samp = 100, lam, prop = 0.6, lam_lwr = 3.
         cat("**Biclustering iteration: ", it, "\n")
         sampIdx <- sample.int(nrow(exp_mat), size = nRowsSample)
         abSol <- rep.int(NA, nrow(exp_mat))
-        curSol <- maximizeOneSplit(exp_mat[sampIdx,], lam, lam.lwr = lam_lwr, 
+        curSol <- maximizeOneSplit(exp_mat[sampIdx,], lam, lam.lwr = lam_lwr,
             clustOptions = clust_opt)
         abSol[sampIdx] <- curSol$ab
         d <- curSol$d
