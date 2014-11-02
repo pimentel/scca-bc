@@ -3,13 +3,15 @@
 \alias{sccab_subsample}
 \title{SCCAB(iclustering) with subsampling}
 \usage{
-sccab_subsample(exp_mat, lam_upr, n_samp = 100, prop = 0.6, lam_lwr = 3.5,
-  parallel = FALSE, clust_opt = list())
+sccab_subsample(exp_mat, params)
 }
 \arguments{
 \item{exp_mat}{matrix with features on rows and conditions on columns}
 
-\item{params}{a sccab_params object from the sccab_params function}
+\item{params}{a sccab_params object from sccab_params()}
+}
+\value{
+a sccab_res object
 }
 \description{
 Given a set of features, will find the most "dominant" bicluster. Works in

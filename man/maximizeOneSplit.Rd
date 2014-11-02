@@ -3,8 +3,8 @@
 \alias{maximizeOneSplit}
 \title{Maximize one split of the SCCAB algorithm}
 \usage{
-maximizeOneSplit(exp_mat, lam, epsA = 0.001, epsB = 0.001, epsD = 0.01,
-  maxIt = 100, lam.lwr, clustOptions = list())
+maximizeOneSplit(exp_mat, params, epsA = 0.001, epsB = 0.001, epsD = 0.01,
+  maxIt = 100)
 }
 \description{
 Maximize one split of the SCCAB algorithm

@@ -3,8 +3,7 @@
 \alias{biClustMax.optim}
 \title{Optimizing the biclustering function}
 \usage{
-biClustMax.optim(X, Y, d_init, lam, verbose = TRUE, lam.lwr = 3.5,
-  clustOptions = list())
+biClustMax.optim(X, Y, d_init, ab_lam, d_lwr, d_upr, d_max_fun)
 }
 \arguments{
 \item{X}{matrix with rows representing genes and columns representing conditions (n x k)}
@@ -13,7 +12,9 @@ biClustMax.optim(X, Y, d_init, lam, verbose = TRUE, lam.lwr = 3.5,
 
 \item{d_init}{vector of dimension k}
 
-\item{lam}{maximum cluster size}
+\item{ab_lam}{regularization on expression features}
+
+\item{ab_lam}{regularization on expression features}
 }
 \value{
 A list containing maximum values of a, b, d

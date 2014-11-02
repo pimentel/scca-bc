@@ -139,6 +139,9 @@ clustKmeans <- function(dat, minK = 2)
 postSubSample.ranks <- function(subSampleSol)
 {
     ab <- getA(subSampleSol)
+    if (any(is.na(ab)))
+        ab <- bootStrapNAs(ab, 0.05, 0.95)
+
     ab_rank <- apply(ab, 2, rank, na.last = "keep")
     print(dim(ab))
 

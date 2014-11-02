@@ -6,20 +6,16 @@
 #' @param X matrix with rows representing genes and columns representing conditions (n x k)
 #' @param Y matrix with rows representing genes and columns representing conditions (n x k)
 #' @param d_init vector of dimension k
-#' @param lam maximum cluster size
+#' @param ab_lam regularization on expression features
+#' @param ab_lam regularization on expression features
 #' @return A list containing maximum values of a, b, d
 #' @export
-biClustMax.optim <- function(X, Y, d_init, lam, verbose = TRUE, lam.lwr = 3.5,
-    clustOptions = list())
+biClustMax.optim <- function(X, Y, d_init, ab_lam, d_lwr, d_upr, d_max_fun)
 {
-    lamx <- 1:3
-    if (!is.null(clustOptions$lamx))
-        lamx <- clustOptions$lamx
-
     # First maximize a and b using SCCA
-    res <- features_max_fscca(X, Y, d_init, lamx, lamx)
+    res <- features_max_fscca(X, Y, d_init, ab_lam, ab_lam)
 
-    d_optim <- lasso_max_d(X, Y, res$a, res$b, lam)
+    d_optim <- d_max_fun(X, Y, res$a, res$b, d_upr)
 
     # print(res$lambda)
 
@@ -27,8 +23,8 @@ biClustMax.optim <- function(X, Y, d_init, lam, verbose = TRUE, lam.lwr = 3.5,
 }
 
 #' Maximize one split of the SCCAB algorithm
-maximizeOneSplit <- function(exp_mat, lam, epsA = 0.001, epsB = 0.001,
-    epsD = 0.01, maxIt = 100, lam.lwr, clustOptions = list())
+maximizeOneSplit <- function(exp_mat, params, epsA = 0.001, epsB = 0.001,
+    epsD = 0.01, maxIt = 100)
 {
     splitIdx <- split_evenly(nrow(exp_mat))
     X <- exp_mat[splitIdx[[1]], ]
@@ -63,8 +59,8 @@ maximizeOneSplit <- function(exp_mat, lam, epsA = 0.001, epsB = 0.001,
     cat(sprintf("% 10s% 7s% 7s\n", "a", "b", "d"))
     repeat {
         # cat("\tOne split iteration: ", it, "\n")
-        curSol <- biClustMax.optim(X, Y, d, lam, lam.lwr = lam.lwr,
-            clustOptions = clustOptions)
+        curSol <- biClustMax.optim(X, Y, d, params$ab_lam, params$d_lwr,
+            params$d_upr, params$optim_fun)
 
         a_dist <- dist(rbind(curSol$a, a))[1]
         b_dist <- dist(rbind(curSol$b, b))[1]
@@ -111,28 +107,25 @@ maximizeOneSplit <- function(exp_mat, lam, epsA = 0.001, epsB = 0.001,
 #' options(cores = N).
 #'
 #' @param exp_mat matrix with features on rows and conditions on columns
-#' @param lam_upr regularization parameter for conditions (maximum number of conditions allows in a bicluster)
-#' @param n_samples integer denoting the number of permutations to perform
-#' @param lam_lwr the lower boundary lambda (minimum number of conditions)
-#' @param parallel if TRUE, use parallel::mclapply instead of lapply
-#' @param clust_opt a list of additional cluster options
+#' @param params a sccab_params object from sccab_params()
+#' @return a sccab_res object
 #' @export
-sccab <- function(exp_mat, lam_upr, n_samples = 100, lam_lwr = 3.5,
-    parallel = FALSE, clust_opt = list())
+sccab <- function(exp_mat, params)
 {
     if (!is.matrix(exp_mat))
         stop("sccab requires a matrix")
 
-    check_lams(lam_lwr, lam_upr, ncol(exp_mat))
+    if (class(params) != "sccab_params")
+        stop("params must be a 'sccab_params' object. Please run sccab_params()")
 
-    apply_fun <- lapply
-    if (parallel)
-        apply_fun <- parallel::mclapply
+    p <- params
 
-    apply_fun(1:n_samples, function(it) {
-        cat("Biclustering iteration: ", it, "\n")
-        maximizeOneSplit(exp_mat, lam = lam_upr, lam.lwr = lam_lwr,
-            clustOptions = clust_opt)
+    check_lams(p$d_lwr, p$d_upr, ncol(exp_mat))
+
+    p$apply_fun(1:p$n_samp,
+        function(it) {
+            cat("Biclustering iteration: ", it, "\n")
+            maximizeOneSplit(exp_mat, p)
         })
 }
 
@@ -143,33 +136,32 @@ sccab <- function(exp_mat, lam_upr, n_samples = 100, lam_lwr = 3.5,
 #' options(mc.cores = N).
 #'
 #' @param exp_mat matrix with features on rows and conditions on columns
-#' @param params a sccab_params object from the sccab_params function
+#' @param params a sccab_params object from sccab_params()
+#' @return a sccab_res object
 #' @export
-sccab_subsample <- function(exp_mat, lam_upr, n_samp = 100, prop = 0.6,
-    lam_lwr = 3.5, parallel = FALSE, clust_opt = list())
+sccab_subsample <- function(exp_mat, params)
 {
     if (!is.matrix(exp_mat))
         stop("sccab requires a matrix")
 
-    # TODO: make sure prop is not NA
+    p <- params
 
-    check_lams(lam_lwr, lam_upr, ncol(exp_mat))
+    if (is.na(p$prop))
+        stop("Must set a sampling proportion (prop) in sccab_params()")
 
-    nRowsSample <- round(prop * nrow(exp_mat))
+    check_lams(p$d_lwr, p$d_upr, ncol(exp_mat))
+
+    nRowsSample <- round(p$prop * nrow(exp_mat))
     if (nRowsSample %% 2)
         nRowsSample <- nRowsSample + 1
 
-    apply_fun <- lapply
-    if (parallel)
-        apply_fun <- parallel::mclapply
-
     cat("Sampling ", nRowsSample, " features\n")
-    apply_fun(1:n_samp, function(it) {
-        cat("**Biclustering iteration: ", it, "\n")
+    p$apply_fun(1:p$n_samp, function(it) {
+        cat("Biclustering iteration: ", it, "\n")
         sampIdx <- sample.int(nrow(exp_mat), size = nRowsSample)
         abSol <- rep.int(NA, nrow(exp_mat))
-        curSol <- maximizeOneSplit(exp_mat[sampIdx,], lam_upr, lam.lwr = lam_lwr,
-            clustOptions = clust_opt)
+        curSol <- maximizeOneSplit(exp_mat[sampIdx,], p)
+
         abSol[sampIdx] <- curSol$ab
         d <- curSol$d
 

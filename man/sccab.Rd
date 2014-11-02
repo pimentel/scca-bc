@@ -3,21 +3,15 @@
 \alias{sccab}
 \title{SCCAB(iclustering) (with all data)}
 \usage{
-sccab(exp_mat, lam_upr, n_samples = 100, lam_lwr = 3.5, parallel = FALSE,
-  clust_opt = list())
+sccab(exp_mat, params)
 }
 \arguments{
 \item{exp_mat}{matrix with features on rows and conditions on columns}
 
-\item{lam_upr}{regularization parameter for conditions (maximum number of conditions allows in a bicluster)}
-
-\item{n_samples}{integer denoting the number of permutations to perform}
-
-\item{lam_lwr}{the lower boundary lambda (minimum number of conditions)}
-
-\item{parallel}{if TRUE, use parallel::mclapply instead of lapply}
-
-\item{clust_opt}{a list of additional cluster options}
+\item{params}{a sccab_params object from sccab_params()}
+}
+\value{
+a sccab_res object
 }
 \description{
 Given a set of features, will find the most "dominant" bicluster. Works in
