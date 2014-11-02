@@ -16,7 +16,8 @@ load("~/Dropbox/biclustering/R/sim50Mvn.sol.RData", verbose = T)
 
 data <- sim50Mvn.sol$data[[1]]$mat
 colnames(data) <- sapply(1:ncol(data), function(x) paste(sample(letters, 3), collapse = ""))
-params <- sccab_params(30, n_samp = 50, ab_lam = c(1, 10, 20))
+
+params <- sccab_params(30, n_samp = 10, ab_lam = c(1, 10, 20))
 res <- sccab(data, params)
 sr <- sccab_result(res, params)
 

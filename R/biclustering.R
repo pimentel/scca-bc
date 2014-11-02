@@ -17,8 +17,6 @@ biClustMax.optim <- function(X, Y, d_init, ab_lam, d_lwr, d_upr, d_max_fun)
 
     d_optim <- d_max_fun(X, Y, res$a, res$b, d_upr)
 
-    # print(res$lambda)
-
     list(a = res$a, b = res$b, d = d_optim, q, sccaLam = res$lambda)
 }
 
@@ -58,7 +56,6 @@ max_one_split <- function(exp_mat, params, epsA = 0.001, epsB = 0.001,
     curSol <- list()
     cat(sprintf("% 10s% 7s% 7s\n", "a", "b", "d"))
     repeat {
-        # cat("\tOne split iteration: ", it, "\n")
         curSol <- biClustMax.optim(X, Y, d, params$ab_lam, params$d_lwr,
             params$d_upr, params$optim_fun)
 
@@ -112,7 +109,7 @@ max_one_split <- function(exp_mat, params, epsA = 0.001, epsB = 0.001,
 #' @export
 sccab <- function(exp_mat, params)
 {
-    if (!is.matrix(exp_mat))
+    if ( !is.matrix(exp_mat) )
         stop("sccab requires a matrix")
 
     if ( !is(params, "sccab_params") )
@@ -129,7 +126,8 @@ sccab <- function(exp_mat, params)
     })
     stop_time <- Sys.time()
 
-    sccab_result(res, params, start_time, stop_time)
+    sccab_result(res, params, rownames(exp_mat), colnames(exp_mat), start_time,
+        stop_time)
 }
 
 #' SCCAB(iclustering) with subsampling
@@ -174,11 +172,14 @@ sccab_subsample <- function(exp_mat, params)
     })
     stop_time <- Sys.time()
 
-    sccab_result(res, params, start_time, stop_time)
+    sccab_result(res, params, rownames(exp_mat), colnames(exp_mat), start_time,
+        stop_time)
+
 }
 
 #' @export
-sccab_result <- function(sols, params, start_time = NA, stop_time = NA)
+sccab_result <- function(sols, params, feature_names = NULL,
+    condition_names = NULL, start_time = NA, stop_time = NA)
 {
     res <- list()
 
@@ -186,12 +187,14 @@ sccab_result <- function(sols, params, start_time = NA, stop_time = NA)
 
     res$AB <- getA(sols)
     stopifnot( ncol(res$AB) == params$n_samp )
+    rownames(res$AB) <- feature_names
 
     res$AB_lam <- do.call(rbind, lapply(sols, function(x) x$sccaLam))
     stopifnot( nrow(res$AB_lam) == params$n_samp )
 
     res$D <- getD(sols)
     stopifnot( ncol(res$D) == params$n_samp )
+    rownames(res$D) <- condition_names
 
     res$params <- params
 
