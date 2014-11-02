@@ -23,7 +23,7 @@ biClustMax.optim <- function(X, Y, d_init, ab_lam, d_lwr, d_upr, d_max_fun)
 }
 
 #' Maximize one split of the SCCAB algorithm
-maximizeOneSplit <- function(exp_mat, params, epsA = 0.001, epsB = 0.001,
+max_one_split <- function(exp_mat, params, epsA = 0.001, epsB = 0.001,
     epsD = 0.01, maxIt = 100)
 {
     splitIdx <- split_evenly(nrow(exp_mat))
@@ -96,8 +96,8 @@ maximizeOneSplit <- function(exp_mat, params, epsA = 0.001, epsB = 0.001,
     ab[splitIdx[[1]]] <- curSol$a
     ab[splitIdx[[2]]] <- curSol$b
 
-    list(a = a, b = b, ab = ab, d = round(curSol$d, digits = 4),
-        splitIdx = splitIdx, sccaLam = curSol$sccaLam)
+    list(ab = ab, d = round(curSol$d, digits = 4), splitIdx = splitIdx,
+        sccaLam = curSol$sccaLam)
 }
 
 #' SCCAB(iclustering) (with all data)
@@ -115,18 +115,21 @@ sccab <- function(exp_mat, params)
     if (!is.matrix(exp_mat))
         stop("sccab requires a matrix")
 
-    if (class(params) != "sccab_params")
+    if ( !is(params, "sccab_params") )
         stop("params must be a 'sccab_params' object. Please run sccab_params()")
 
     p <- params
 
     check_lams(p$d_lwr, p$d_upr, ncol(exp_mat))
 
-    p$apply_fun(1:p$n_samp,
-        function(it) {
-            cat("Biclustering iteration: ", it, "\n")
-            maximizeOneSplit(exp_mat, p)
-        })
+    start_time <- Sys.time()
+    res <- p$apply_fun(1:p$n_samp, function(it) {
+        cat("Biclustering iteration: ", it, "\n")
+        max_one_split(exp_mat, p)
+    })
+    stop_time <- Sys.time()
+
+    sccab_result(res, params, start_time, stop_time)
 }
 
 #' SCCAB(iclustering) with subsampling
@@ -156,15 +159,78 @@ sccab_subsample <- function(exp_mat, params)
         nRowsSample <- nRowsSample + 1
 
     cat("Sampling ", nRowsSample, " features\n")
-    p$apply_fun(1:p$n_samp, function(it) {
+    start_time <- Sys.time()
+    res <- p$apply_fun(1:p$n_samp, function(it) {
         cat("Biclustering iteration: ", it, "\n")
         sampIdx <- sample.int(nrow(exp_mat), size = nRowsSample)
-        abSol <- rep.int(NA, nrow(exp_mat))
-        curSol <- maximizeOneSplit(exp_mat[sampIdx,], p)
+        abSol <- rep.int(NA_real_, nrow(exp_mat))
+
+        curSol <- max_one_split(exp_mat[sampIdx,], p)
 
         abSol[sampIdx] <- curSol$ab
         d <- curSol$d
 
         list(ab = abSol, d = d, sccaLam = curSol$sccaLam)
     })
+    stop_time <- Sys.time()
+
+    sccab_result(res, params, start_time, stop_time)
+}
+
+#' @export
+sccab_result <- function(sols, params, start_time = NA, stop_time = NA)
+{
+    res <- list()
+
+    stopifnot( is(params, "sccab_params") )
+
+    res$AB <- getA(sols)
+    stopifnot( ncol(res$AB) == params$n_samp )
+
+    res$AB_lam <- do.call(rbind, lapply(sols, function(x) x$sccaLam))
+    stopifnot( nrow(res$AB_lam) == params$n_samp )
+
+    res$D <- getD(sols)
+    stopifnot( ncol(res$D) == params$n_samp )
+
+    res$params <- params
+
+    attr(res, "start_time") <- start_time
+    attr(res, "stop_time") <- stop_time
+
+    class(res) <- "sccab_result"
+
+    res
+}
+
+#' Printing a sccab_result
+#'
+#' If \code{sccab} is called (the non-subsampled version) and
+#' \code{!is.na(prop)} in \code{sccab_params}, it will still print
+#' a subsampling proportion, even though no subsampling occured.
+#'
+#' @param obj the \code{sccab_result} object to be printed
+#' @return returns \code{obj} using \code{\link{invisible}(obj)}
+#' @export
+print.sccab_result <- function(obj)
+{
+    cat(sprintf("sccab_result\n"))
+    cat("----------------------------------------\n")
+    if (is.na(attr(obj, "start_time")) || is.na(attr(obj, "stop_time")))
+    {
+        cat("No info on timing\n")
+    }
+    else
+    {
+        cat(sprintf("%10s:\t%s\n", "start time", attr(obj, "start_time")))
+        cat(sprintf("%10s:\t%s\n", "stop time", attr(obj, "stop_time")))
+        d_time <- attr(obj, "stop_time") - attr(obj, "start_time")
+        cat(sprintf("%10s:\t%.3f %s\n", "total time", as.numeric(d_time),
+                units(d_time)))
+    }
+
+    cat("\n")
+    invisible(print(obj$params))
+
+    invisible(obj)
 }

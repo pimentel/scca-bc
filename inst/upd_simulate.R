@@ -15,11 +15,14 @@ a <- postSubSample.pca(res)
 load("~/Dropbox/biclustering/R/sim50Mvn.sol.RData", verbose = T)
 
 data <- sim50Mvn.sol$data[[1]]$mat
+colnames(data) <- sapply(1:ncol(data), function(x) paste(sample(letters, 3), collapse = ""))
 params <- sccab_params(30, n_samp = 50, ab_lam = c(1, 10, 20))
 res <- sccab(data, params)
+sr <- sccab_result(res, params)
 
-params <- sccab_params(30, n_samp = 50, ab_lam = c(1, 10, 20), prop = 0.6)
+params <- sccab_params(30, n_samp = 50, ab_lam = c(1, 10, 20), prop = 0.6, parallel = F)
 res1 <- sccab_subsample(data, params)
+hi <- sccab_result(res1, FALSE,params)
 x <- ggPlotSSSolution(res1)
 
 res2 <- sccab(data, 30, 50, clust_opt = list(lamx = c(1, 2, 3)))
