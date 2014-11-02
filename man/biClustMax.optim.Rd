@@ -3,7 +3,7 @@
 \alias{biClustMax.optim}
 \title{Optimizing the biclustering function}
 \usage{
-biClustMax.optim(X, Y, d.start, lam, verbose = TRUE, lam.lwr = 3.5,
+biClustMax.optim(X, Y, d_init, lam, verbose = TRUE, lam.lwr = 3.5,
   clustOptions = list())
 }
 \arguments{
@@ -11,7 +11,7 @@ biClustMax.optim(X, Y, d.start, lam, verbose = TRUE, lam.lwr = 3.5,
 
 \item{Y}{matrix with rows representing genes and columns representing conditions (n x k)}
 
-\item{d.start}{vector of dimension k}
+\item{d_init}{vector of dimension k}
 
 \item{lam}{maximum cluster size}
 }

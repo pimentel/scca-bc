@@ -1,25 +1,3 @@
-detect_d_maximizer <- function(opt)
-{
-    if (class(opt) != "character" && class(opt) != "function")
-        stop("Variable 'opt' must be a character (\"lasso\", \"timeseries\") " +
-            " or function")
-
-    if (class(opt) == "function")
-        return(opt)
-
-    switch (opt,
-        lasso = {
-            return(lasso_max_d)
-        },
-        timeseries = {
-            return(timeseries_max_d)
-        },
-        stop("Unrecognized 'opt' type. Please specify \"lasso\"," +
-            " \"timeseries\", or pass a function")
-        )
-}
-
-
 #' Maximize the d vector in biclustering
 #'
 #' Find the solution to the quadratic program:
@@ -177,6 +155,5 @@ old_lasso_max_d <- function(X, Y, a, b, s)
 
     }
 
-    
     return(optimRes$par)
 }

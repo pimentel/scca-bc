@@ -5,11 +5,11 @@
 #'
 #' @param X matrix with rows representing genes and columns representing conditions (n x k)
 #' @param Y matrix with rows representing genes and columns representing conditions (n x k)
-#' @param d.start vector of dimension k
+#' @param d_init vector of dimension k
 #' @param lam maximum cluster size
 #' @return A list containing maximum values of a, b, d
 #' @export
-biClustMax.optim <- function(X, Y, d.start, lam, verbose = TRUE, lam.lwr = 3.5,
+biClustMax.optim <- function(X, Y, d_init, lam, verbose = TRUE, lam.lwr = 3.5,
     clustOptions = list())
 {
     lamx <- 1:3
@@ -17,7 +17,7 @@ biClustMax.optim <- function(X, Y, d.start, lam, verbose = TRUE, lam.lwr = 3.5,
         lamx <- clustOptions$lamx
 
     # First maximize a and b using SCCA
-    res <- features_max_fscca(X, Y, d.start, lamx, lamx)
+    res <- features_max_fscca(X, Y, d_init, lamx, lamx)
 
     d_optim <- lasso_max_d(X, Y, res$a, res$b, lam)
 
@@ -143,12 +143,7 @@ sccab <- function(exp_mat, lam_upr, n_samples = 100, lam_lwr = 3.5,
 #' options(mc.cores = N).
 #'
 #' @param exp_mat matrix with features on rows and conditions on columns
-#' @param lam_upr regularization parameter for conditions (maximum number of conditions allows in a bicluster)
-#' @param n_samp integer denoting the number of permutations to perform
-#' @param prop Proportion to subsample
-#' @param lam_lwr the lower boundary lambda (minimum number of conditions)
-#' @param parallel if TRUE use parallel::mclapply, else use lapply
-#' @param clust_opt a list of additional cluster options
+#' @param params a sccab_params object from the sccab_params function
 #' @export
 sccab_subsample <- function(exp_mat, lam_upr, n_samp = 100, prop = 0.6,
     lam_lwr = 3.5, parallel = FALSE, clust_opt = list())
@@ -156,11 +151,7 @@ sccab_subsample <- function(exp_mat, lam_upr, n_samp = 100, prop = 0.6,
     if (!is.matrix(exp_mat))
         stop("sccab requires a matrix")
 
-    if (prop == 1.0)
-        stop("For prop == 1, use sccab")
-
-    if (prop > 1 | prop < 0.01)
-        stop("Invalid range for prop")
+    # TODO: make sure prop is not NA
 
     check_lams(lam_lwr, lam_upr, ncol(exp_mat))
 
