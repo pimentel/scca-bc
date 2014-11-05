@@ -124,7 +124,7 @@ sccab_params <- function(d_upr, n_samp = 100, d_lwr = 3, ab_lam = c(0.5,3, 10),
 #' @export
 print.sccab_params <- function(obj)
 {
-    cat("sccab_params object\n")
+    cat("sccab_params\n")
     cat("----------------------------------------\n")
     cat(sprintf("%10s:\t(%.2f, %.2f)\n", "d", obj$d_lwr, obj$d_upr))
     cat(sprintf("%10s:\t(%s)\n", "ab", paste(obj$ab_lam, collapse = ", ")))

@@ -24,7 +24,7 @@ lasso_max_d <- function(X, Y, a, b, s)
 #' @export
 .lasso_max_d <- function(q, s)
 {
-    # XXX: Not checking if s > 0... a program above should check
+    # XXX: Not checking if s > 0... a function upstream should check
     d <- rep.int(0, length(q))
 
     n_gt0 <- length(which(q > 0))

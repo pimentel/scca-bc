@@ -36,17 +36,15 @@ bootStrapNAs <- function(dat, lwr, upr)
     return(dat)
 }
 
-# XXX: This is the best performing method
 #' @export
-postSubSample.pca <- function(subSampleSol, abThresh = 0.6, dQuant = 0.5)
+pss_pca <- function(s_res)
 {
-    # rows are different permutations,
-    # columns are the genes or conditions
-    ab <- t(sapply(subSampleSol, function (x) abs(x$ab)))
-    d <- t(sapply(subSampleSol, function (x) x$d))
+    stopifnot( is(s_res, "sccab_result") )
 
+    ab <- t(s_res$AB)
+    d <- s_res$D
 
-    if (sum(is.na(ab)) > 0)
+    if (any(is.na(ab)))
         ab <- bootStrapNAs(ab, 0.05, 0.95)
 
     pcaAB <- prcomp(ab, center = F, scale. = F)
@@ -60,7 +58,7 @@ postSubSample.pca <- function(subSampleSol, abThresh = 0.6, dQuant = 0.5)
     pcaAB$rotation[,"cov"] <- with(pcaAB$rotation, sd / mean)
 
     pcaD <- prcomp(d, center = F, scale. = F)
-    dQuant <- apply(d, 2, quantile, probs = dQuant, na.rm = T)
+    # dQuant <- apply(d, 2, quantile, probs = dQuant, na.rm = T)
     dSd <- apply(d, 2, sd, na.rm = T)
 
 
@@ -74,7 +72,6 @@ postSubSample.pca <- function(subSampleSol, abThresh = 0.6, dQuant = 0.5)
         rnorm(nrow(pcaD$rotation), sd = 0.0001))
                  # pcaD$rotation[,"PC2"] * pcaD$sdev[2])
     colIdx <- clustKmeans(df2)
-    # colIdx <- clustKmeans(cbind(dQuant))
 
     pcaAB$rotation$cluster <- FALSE
     pcaAB$rotation$cluster[rowIdx] <- TRUE
@@ -83,28 +80,24 @@ postSubSample.pca <- function(subSampleSol, abThresh = 0.6, dQuant = 0.5)
     pcaD$rotation[,"cluster"] <- "background"
     pcaD$rotation[colIdx,"cluster"] <- "bicluster"
 
-    return(list(abDat = data.frame(pcaAB$rotation, sdev = pcaAB$sdev), dDat = pcaD,
+    return(list(
+            abDat = data.frame(pcaAB$rotation),
+            dDat = data.frame(pcaD$rotation),
             rowIdx = rowIdx, colIdx = colIdx))
-    # return(list(rowIdx = rowIdx, colIdx = colIdx))
 }
 
 #' @export
-post_hclust <- function(subSampleSol)
+pss_hclust <- function(s_res)
 {
-    A <- getA(subSampleSol)
-    D <- getD(subSampleSol)
+    stopifnot( is(s_res, "sccab_result") )
+
+    A <- s_res$AB
+    D <- s_res$D
 
     cutHCluster <- function(mat)
     {
         hc <- hclust(dist(mat))
         hcCuts <- cutree(hc, 2)
-
-        # cutIdx <- 1
-        # if (mean(hcCuts == 1) > 0.5)
-        # {
-        #     cutIdx <- 2
-        # }
-        # cutIdx <- which(hcCuts == cutIdx)
 
         cutIdx <- 1
         if (mean(mat[which(hcCuts == 1), ]) <
@@ -122,6 +115,7 @@ post_hclust <- function(subSampleSol)
 
     return(list(rowIdx = rowIdx, colIdx = colIdx))
 }
+
 clustKmeans <- function(dat, minK = 2)
 {
     gap <- cluster::clusGap(as.matrix(dat), kmeans, 5)
@@ -136,9 +130,11 @@ clustKmeans <- function(dat, minK = 2)
 }
 
 #' @export
-postSubSample.ranks <- function(subSampleSol)
+pss_ranks <- function(s_res)
 {
-    ab <- getA(subSampleSol)
+    stopifnot( is(s_res, "sccab_result") )
+
+    ab <- s_res$AB
     if (any(is.na(ab)))
         ab <- bootStrapNAs(ab, 0.05, 0.95)
 
@@ -155,7 +151,7 @@ postSubSample.ranks <- function(subSampleSol)
     ab_features$in_clust[rowIdx] <- TRUE
 
 
-    d <- getD(subSampleSol)
+    d <- s_res$D
     d_rank <- apply(d, 2, rank)
     pca_d <- prcomp(t(d), center = F, scale. = F)
 

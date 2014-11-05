@@ -14,8 +14,9 @@ ggPlotSSSolution <- function(parSol, clust = NA, fBase = NA, rowNames = NA,
                               colNames = NA)
 {
     par(ask = FALSE)
-    A <- abs(sapply(parSol, function (x) x$ab))
-    D <- sapply(parSol, function (x) x$d)
+
+    A <- parSol$AB
+    D <- parSol$D
 
     if (!is.na(clust)[1])
     {
