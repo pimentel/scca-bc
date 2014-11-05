@@ -1,3 +1,122 @@
+#' @export
+pps <- function(s_res, row_mode, col_mode)
+{
+    stopifnot( is(s_res, "sccab_result") )
+    row_func <- get_pps(row_mode)
+    col_func <- get_pps(col_mode)
+
+    row_idx <- row_func(s_res$AB)
+    col_idx <- col_func(s_res$D)
+
+
+    list(rowIdx = row_idx, colIdx = col_idx)
+}
+
+# TODO: write docs
+#' @export
+get_pps <- function(pps_mode)
+{
+    stopifnot( is(pps_mode, "character") || is(pps_mode, "function"))
+
+    if (is(pps_mode, "function") )
+        return(pps_mode)
+
+    switch(pps_mode,
+        "pca" = pps_pca.matrix,
+        "rank_pca" = pps_ranks.matrix,
+        "hclust" = pps_hclust.matrix,
+        stop("Unrecognized post-processing mode. Please see docs for get_pps")
+        )
+}
+
+#' @export
+pps_pca.matrix <- function(res)
+{
+    if ( any(is.na(res)) )
+        res <- bootStrapNAs(res, 0.05, 0.95)
+
+    res <- t(res)
+
+    pca <- prcomp(res, center = F, scale. = F)
+
+
+    features <- cbind(-pca$rotation[,'PC1'] * pca$sdev[1],
+        pca$rotation[,'PC2'] * pca$sdev[2])
+
+    idx <- clustKmeans(features)
+
+    features <- as.data.frame(features)
+    features$cluster <- FALSE
+    features$cluster[idx] <- TRUE
+
+    list(idx = idx, features = features)
+}
+
+
+#' @export
+pps_hclust.matrix <- function(res)
+{
+    cutHCluster <- function(mat)
+    {
+        hc <- hclust(dist(mat))
+        hcCuts <- cutree(hc, 2)
+
+        cutIdx <- 1
+        if (mean(mat[which(hcCuts == 1), ]) <
+            mean(mat[which(hcCuts == 2), ]))
+        {
+            cutIdx <- 2
+        }
+        cutIdx <- which(hcCuts == cutIdx)
+
+        return(cutIdx)
+    }
+
+    idx <- cutHCluster(res)
+
+    list(idx = idx)
+}
+
+#' @export
+clustKmeans <- function(dat, minK = 2)
+{
+    dat <- round(dat, 6) +
+        rnorm(nrow(dat) * ncol(dat), mean = 0, sd = 0.00001)
+    gap <- cluster::clusGap(as.matrix(dat), kmeans, 5)
+    nk <- cluster::maxSE(gap$Tab[,"gap"], gap$Tab[,"SE.sim"])
+    if (nk == 1)
+        nk <- minK
+    cat("Conditions k: ", nk, "\n")
+    kRes <- kmeans(dat, nk, nstart = 20)
+    kMax <- which.max(kRes$centers[,1])
+
+    which(kRes$cluster == kMax)
+}
+
+
+#' @export
+pps_ranks.matrix <- function(res)
+{
+    if ( any(is.na(res)) )
+        res <- bootStrapNAs(res, 0.05, 0.95)
+
+    res_ranks <- apply(res, 2, rank, na.last = "keep")
+
+    pca <- prcomp(t(res_ranks), center = F, scale. = F)
+
+    features <- cbind(-pca$rotation[,'PC1'] * pca$sdev[1],
+        pca$rotation[,'PC2'] * pca$sdev[2])
+
+    idx <- clustKmeans(features)
+
+    features <- as.data.frame(features)
+    features$cluster <- FALSE
+    features$cluster[idx] <- TRUE
+
+    list(idx = idx, features = features)
+}
+
+#' Works column-wise
 bootStrapNAs <- function(dat, lwr, upr)
 {
     for (icol in 1:ncol(dat))
@@ -36,16 +155,50 @@ bootStrapNAs <- function(dat, lwr, upr)
     return(dat)
 }
 
+
+################################################################################
+# old functions
+################################################################################
+
 #' @export
-pss_pca <- function(s_res)
+pss_hclust <- function(s_res)
+{
+    stopifnot( is(s_res, "sccab_result") )
+
+    A <- s_res$AB
+    D <- s_res$D
+
+    cutHCluster <- function(mat)
+    {
+        hc <- hclust(dist(mat))
+        hcCuts <- cutree(hc, 2)
+
+        cutIdx <- 1
+        if (mean(mat[which(hcCuts == 1), ]) <
+            mean(mat[which(hcCuts == 2), ]))
+        {
+            cutIdx <- 2
+        }
+        cutIdx <- which(hcCuts == cutIdx)
+
+        return(cutIdx)
+    }
+
+    rowIdx <- cutHCluster(A)
+    colIdx <- cutHCluster(D)
+
+    return(list(rowIdx = rowIdx, colIdx = colIdx))
+}
+#' @export
+pss_pca_old <- function(s_res)
 {
     stopifnot( is(s_res, "sccab_result") )
 
     ab <- t(s_res$AB)
-    d <- s_res$D
+    d <- t(s_res$D)
 
     if (any(is.na(ab)))
-        ab <- bootStrapNAs(ab, 0.05, 0.95)
+        ab <- bootStrapNAs(t(ab), 0.05, 0.95)
 
     pcaAB <- prcomp(ab, center = F, scale. = F)
     # pcaAB <- prcomp(ab)
@@ -85,50 +238,6 @@ pss_pca <- function(s_res)
             dDat = data.frame(pcaD$rotation),
             rowIdx = rowIdx, colIdx = colIdx))
 }
-
-#' @export
-pss_hclust <- function(s_res)
-{
-    stopifnot( is(s_res, "sccab_result") )
-
-    A <- s_res$AB
-    D <- s_res$D
-
-    cutHCluster <- function(mat)
-    {
-        hc <- hclust(dist(mat))
-        hcCuts <- cutree(hc, 2)
-
-        cutIdx <- 1
-        if (mean(mat[which(hcCuts == 1), ]) <
-            mean(mat[which(hcCuts == 2), ]))
-        {
-            cutIdx <- 2
-        }
-        cutIdx <- which(hcCuts == cutIdx)
-
-        return(cutIdx)
-    }
-
-    rowIdx <- cutHCluster(A)
-    colIdx <- cutHCluster(D)
-
-    return(list(rowIdx = rowIdx, colIdx = colIdx))
-}
-
-clustKmeans <- function(dat, minK = 2)
-{
-    gap <- cluster::clusGap(as.matrix(dat), kmeans, 5)
-    nk <- cluster::maxSE(gap$Tab[,"gap"], gap$Tab[,"SE.sim"])
-    if (nk == 1)
-        nk <- minK
-    cat("Conditions k: ", nk, "\n")
-    kRes <- kmeans(dat, nk, nstart = 20)
-    kMax <- which.max(kRes$centers[,1])
-
-    which(kRes$cluster == kMax)
-}
-
 #' @export
 pss_ranks <- function(s_res)
 {

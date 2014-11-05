@@ -9,6 +9,15 @@ params <- sccab_params(15, n_samp = 50, ab_lam = c(1, 10, 20))
 res <- sccab(cm_data, params)
 
 a <- pss_pca(res)
+
+hi <- pps(res, "rank_pca", "pca")
+
+debug(pss_pca.matrix)
+a_d <- pss_pca.matrix(res$D)
+
+debugonce(clustKmeans)
+clustKmeans(a_d$features[,1:2])
+
 h <- pss_hclust(res)
 r <- pss_ranks(res)
 
