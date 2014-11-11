@@ -174,7 +174,6 @@ sccab_subsample <- function(exp_mat, params)
 
     sccab_result(res, params, rownames(exp_mat), colnames(exp_mat), start_time,
         stop_time)
-
 }
 
 #' @export

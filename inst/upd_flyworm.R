@@ -5,6 +5,12 @@ flyWorm <- as.matrix(flyWorm)
 
 p <- sccab_params(30, 50, ab_lam = c(0.0005, 0.001, 0.05))
 fwbc <- sccab(flyWorm, p)
+
+fw_scca <- pps_scca(fwbc)
+fw_ranks <- pps(fwbc, "rank_pca", "pca")
+fw_pca <- pps(fwbc, "pca", "pca")
+fw_hclust <- pps(fwbc, "hclust", "pca")
+
 x <- ggPlotSSSolution(fwbc)
 
 

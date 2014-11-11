@@ -8,6 +8,9 @@ cm_data <- constMean.sol$data[[1]]$mat
 params <- sccab_params(15, n_samp = 50, ab_lam = c(1, 10, 20))
 res <- sccab(cm_data, params)
 
+debugonce(pps_scca)
+scca_res <- pps_scca(res)
+
 a <- pss_pca(res)
 
 hi <- pps(res, "rank_pca", "pca")
@@ -34,7 +37,6 @@ a <- postSubSample.pca(res)
 # cor sim
 ################################################################################
 
-
 load("~/Dropbox/biclustering/R/sim50Mvn.sol.RData", verbose = T)
 
 data <- sim50Mvn.sol$data[[1]]$mat
@@ -43,6 +45,14 @@ rownames(data) <- sapply(1:nrow(data), function(x) paste(sample(letters, 10), co
 
 params <- sccab_params(30, n_samp = 50, ab_lam = c(1, 10, 20))
 res <- sccab(data, params)
+
+scca_res <- pps_scca(res)
+clusGap(scca_res$A, kmeans, 6)
+
+debugonce(clustKmeans)
+clustKmeans(scca_res$A, add_noise = F)
+
+kmeans(scca_res$A, 2)
 
 a <- pss_pca(res)
 
@@ -79,6 +89,8 @@ jaccard_idx_matrix(list(r2), list(list(rowIdx = 1:300, colIdx = 1:30)))
 
 jaccard_idx_matrix(list(h), list(list(rowIdx = 1:300, colIdx = 1:30)))
 jaccard_idx_matrix(list(h2), list(list(rowIdx = 1:300, colIdx = 1:30)))
+
+jaccard_idx_matrix(list(scca_res), list(list(rowIdx = 1:300, colIdx = 1:30)))
 
 jaccard_idx_matrix(list(a), list(list(rowIdx = 1:300, colIdx = 1:30)))
 jaccard_idx_matrix(list(a1), list(list(rowIdx = 1:300, colIdx = 1:30)))

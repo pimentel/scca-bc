@@ -78,10 +78,12 @@ pps_hclust.matrix <- function(res)
 }
 
 #' @export
-clustKmeans <- function(dat, minK = 2)
+clustKmeans <- function(dat, minK = 2, add_noise = T)
 {
-    dat <- round(dat, 6) +
-        rnorm(nrow(dat) * ncol(dat), mean = 0, sd = 0.00001)
+    dat <- round(dat, 6)
+    if (add_noise)
+        dat <- dat + rnorm(nrow(dat) * ncol(dat), mean = 0, sd = 0.00001)
+
     gap <- cluster::clusGap(as.matrix(dat), kmeans, 5)
     nk <- cluster::maxSE(gap$Tab[,"gap"], gap$Tab[,"SE.sim"])
     if (nk == 1)
@@ -114,6 +116,20 @@ pps_ranks.matrix <- function(res)
     features$cluster[idx] <- TRUE
 
     list(idx = idx, features = features)
+}
+
+#' @export
+pps_scca <- function(res)
+{
+    AB <- t(res$AB)
+    D <- t(res$D)
+
+    # fscca::fscca(AB, D, "lasso", "lasso", 1:10, 1:10)
+    s_res <- scca(AB, D, "LASSO", seq(0.05, 0.5, length.out = 5), 1:3, center = F, scale = F)
+    rowIdx <- clustKmeans(abs(s_res$A), add_noise = F)
+    colIdx <- clustKmeans(abs(s_res$B), add_noise = T)
+
+    list(rowIdx = rowIdx, colIdx = colIdx)
 }
 
 #' Works column-wise
@@ -662,7 +678,7 @@ postSubSample.tightPCA <- function(subSampleSol, abThresh = 0.6, dQuant = 0.5)
 
 
 # Each row is a gene, each column is a different iteration
-getA <- function(bcSol, takeAbs = TRUE)
+getA <- function(bcSol, takeAbs = F)
 {
     if (takeAbs)
         return( abs(sapply(bcSol, function (x) x$ab)) )
