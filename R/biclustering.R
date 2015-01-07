@@ -177,6 +177,61 @@ sccab_subsample <- function(exp_mat, params)
 }
 
 #' @export
+sccab_sub <- function(exp_mat, params, n_it = 10)
+{
+    if (!is.matrix(exp_mat))
+        stop("sccab requires a matrix")
+
+    p <- params
+
+    if (is.na(p$prop))
+        stop("Must set a sampling proportion (prop) in sccab_params()")
+
+    check_lams(p$d_lwr, p$d_upr, ncol(exp_mat))
+
+    nRowsSample <- round(p$prop * nrow(exp_mat))
+    if (nRowsSample %% 2)
+        nRowsSample <- nRowsSample + 1
+
+    # XXX: consider changing this to make the inner loop parallel
+    # Currently, outer loop is parallel
+    p_pass <- p
+    p_pass$apply_fun <- lapply
+
+    cat("Sampling ", nRowsSample, " features\n")
+    start_time <- Sys.time()
+    res <- p$apply_fun(1:n_it, function(it) {
+        cat("**************************************************", "\n")
+        cat("* Split number ", it, "\n")
+        cat("**************************************************", "\n")
+
+        samp_idx <- sample.int(nrow(exp_mat), size = nRowsSample)
+
+        list(result = sccab(exp_mat[samp_idx,], p_pass), samp_idx = samp_idx)
+    })
+    stop_time <- Sys.time()
+
+    # TODO: make an official class?
+    # TODO: add time as attribute
+
+    res
+}
+
+#' @export
+adjust_ab_matrix <- function(AB, nrows, which_idx)
+{
+    AB_new <- matrix(NA_real_, nrow = nrows, ncol(AB))
+    AB_new[which_idx,] <- AB
+    AB_new
+}
+
+#' @export
+translate_idx <- function(mapping, idx)
+{
+    mapping[idx]
+}
+
+#' @export
 sccab_result <- function(sols, params, feature_names = NULL,
     condition_names = NULL, start_time = NA, stop_time = NA)
 {

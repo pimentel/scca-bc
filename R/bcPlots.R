@@ -11,7 +11,7 @@
 #' @return A list with two ggplot objects
 #' @export
 ggPlotSSSolution <- function(parSol, clust = NA, fBase = NA, rowNames = NA,
-                              colNames = NA)
+                              colNames = NA, re_order = NULL)
 {
     par(ask = FALSE)
 
@@ -82,7 +82,7 @@ ggPlotSSSolution <- function(parSol, clust = NA, fBase = NA, rowNames = NA,
 
     res$condPlot <- p
     # Saving 6.62 x 12.8 in image
-    return(res)
+    invisible(res)
 }
 
 

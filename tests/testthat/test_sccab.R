@@ -44,3 +44,43 @@ test_that("valid sccab result",
         res <- sccab_result(dummy_sccab, p)
         expect_is(res, "sccab_result")
     })
+
+context("check AB matrix")
+test_that("valid AB change",
+    {
+        X <- matrix(1:4, nrow = 4, ncol = 5)
+        Y <- adjust_ab_matrix(X, 6, c(1, 3, 4, 5))
+        expect_equal(Y[2,], rep(NA_real_, 5))
+        expect_equal(Y[6,], rep(NA_real_, 5))
+        expect_equal(Y[c(1, 3, 4, 5), ], X)
+    })
+
+context("translate index")
+test_that("valid translation",
+    {
+        mapping <- c(1, 3, 5, 6, 9)
+        which_idx <- c(1, 5, 2)
+        res <- translate_idx(mapping, which_idx)
+        expect_equal(res, c(1, 9, 3))
+
+        mapping <- c(9, 3, 6, 1)
+        which_idx <- c(1, 4, 2)
+        res <- translate_idx(mapping, which_idx)
+        expect_equal(res, c(9, 1, 3))
+    })
+
+context("test post processing sub")
+test_that("correct translation?",
+    {
+        # TODO: write me!
+    })
+
+context("count_index")
+test_that("count_index",
+    {
+        idx <- as.integer(sample(c(1:4, rep(1, 3), rep(2, 2))))
+        idx_res <- count_index(idx)
+
+        expect_equivalent(idx_res,
+            data.frame(index = 1:4, count = as.integer(c(4, 3, 1, 1))))
+    })

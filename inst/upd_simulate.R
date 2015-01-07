@@ -46,6 +46,109 @@ rownames(data) <- sapply(1:nrow(data), function(x) paste(sample(letters, 10), co
 params <- sccab_params(30, n_samp = 50, ab_lam = c(1, 10, 20))
 res <- sccab(data, params)
 
+params <- sccab_params(30, n_samp = 10, ab_lam = c(1, 10, 20), prop = 0.75)
+ss_res <- sccab_sub(data, params, 50)
+
+ggPlotSSSolution(ss_res[[1]]$result)
+ggPlotSSSolution(ss_res[[2]]$result)
+ggPlotSSSolution(ss_res[[3]]$result)
+ggPlotSSSolution(ss_res[[4]]$result)
+
+ss_res_fix <- lapply(ss_res, function(x)
+    {
+        x$result$AB <- adjust_ab_matrix(x$result$AB, nrow(data), x$samp_idx)
+        x
+    })
+
+ggPlotSSSolution(ss_res_fix[[1]]$result)
+ggPlotSSSolution(ss_res_fix[[2]]$result)
+ggPlotSSSolution(ss_res_fix[[3]]$result)
+ggPlotSSSolution(ss_res_fix[[4]]$result)
+ggPlotSSSolution(ss_res_fix[[10]]$result)
+
+
+j_idx <- function(pred, truth)
+{
+    length(intersect(pred, truth)) / length(union(pred, truth))
+
+
+j_idx <- function(pred, truth)
+{
+    length(intersect(pred, truth)) / length(union(pred, truth))
+}
+
+tpr <- function(pred, truth)
+{
+    tp <- intersect(pred, truth)
+    length(tp) / length(truth)
+}
+
+fpr <- function(pred, true_neg)
+{
+    fp <- intersect(pred, true_neg)
+    length(fp) / length(true_neg)
+}
+
+
+params <- sccab_params(30, n_samp = 50, ab_lam = c(1, 10, 20), prop = 0.75)
+ss_res_50 <- sccab_sub(data, params, 50)
+sub_idx_50 <- pps_sub(ss_res_50, 0.5, nrow(data), get_pps("hclust"))
+
+params <- sccab_params(30, n_samp = 100, ab_lam = c(1, 10, 20), prop = 0.75)
+ss_res_100_1 <- sccab_sub(data, params, 10)
+ss_res_100_2 <- sccab_sub(data, params, 10)
+
+ss_res_l <- vector("list", length(3:10))
+for (i in 3:10)
+{
+    cat("********************************************************************************\n")
+    cat("********************************************************************************\n")
+    cat(i-2, "\n")
+    cat("********************************************************************************\n")
+    cat("********************************************************************************\n")
+    tryCatch(
+        {
+            cur <- sccab_sub(data, params, 10)
+            ss_res_l[[i - 2]] <- cur
+        }, error = function(e) {
+            print(e)
+        })
+}
+
+ss_res_join <- Reduce(c, ss_res_l)
+ss_res_join <- c(ss_res_join, ss_res_100_1, ss_res_100_2)
+sub_idx <- pps_sub(ss_res_join, 0.5, nrow(data), get_pps("hclust"))
+# still looks like crap
+
+################################################################################
+# another try... do lots of resampling
+################################################################################
+
+params <- sccab_params(30, n_samp = 1, ab_lam = c(1, 10, 20), prop = 0.75)
+ss_res_lots_small <- sccab_sub(data, params, 1000)
+
+sub_idx_lots_small <- pps_sub(ss_res_lots_small, 0.5, nrow(data), get_pps("hclust"))
+
+
+debug(pps_sub)
+sub_idx <- pps_sub(ss_res, 0.5, nrow(data), get_pps("hclust"))
+sub_idx <- pps_sub(ss_res, 0.5, nrow(data), get_pps("pca"))
+sub_idx
+
+jaccard_idx_matrix(list(sub_idx), list(list(rowIdx = 1:300, colIdx = 1:30)))
+jaccard_idx_matrix(list(sub_idx_50), list(list(rowIdx = 1:300, colIdx = 1:30)))
+jaccard_idx_matrix(list(sub_idx_lots_small), list(list(rowIdx = 1:300, colIdx = 1:30)))
+
+scca_res <- pps_scca(res)
+clusGap(scca_res$A, kmeans, 6)
+
+debugonce(clustKmeans)
+
+scca_res <- pps_scca(res)
+clusGap(scca_res$A, kmeans, 6)
+
+debugonce(clustKmeans)
+
 scca_res <- pps_scca(res)
 clusGap(scca_res$A, kmeans, 6)
 

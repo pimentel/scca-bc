@@ -171,6 +171,56 @@ bootStrapNAs <- function(dat, lwr, upr)
     return(dat)
 }
 
+#' count indeces
+#'
+#' @param idx a vector of indices (usually integer) with repeating values
+#' @return a data.frame with columns "index" referring to the index and
+#' "count", the count of the index
+count_index <- function(idx)
+{
+    counts <- reshape2::melt(idx) %>%
+        group_by(value) %>%
+        summarise(count = length(value)) %>%
+        rename(index = value)
+
+    counts
+}
+
+#' @export
+pps_sub <- function(sub_res, prop, n_rows, pps_fun)
+{
+    each_idx <- lapply(sub_res, function(x)
+    {
+        translate_idx(x$samp_idx,
+            pps_fun(x$result$AB)$idx)
+    })
+    lapply(sub_res, function(x) intersect(1:300, x$i))
+
+    count_table <- table(unlist(each_idx))
+    m_count_table <- reshape2::melt(count_table, varnames = c("idx"),
+        value.name = "count")
+    gt <- dplyr::filter(
+        m_count_table,
+        count > prop * length(each_idx))
+    row_idx <- gt$idx
+
+    # deal w/ cols
+    each_idx <- lapply(sub_res, function(x)
+    {
+            pps_fun(x$result$D)$idx
+    })
+
+    count_table <- table(unlist(each_idx))
+    m_count_table <- reshape2::melt(count_table, varnames = c("idx"),
+        value.name = "count")
+    gt <- dplyr::filter(
+        m_count_table,
+        count > prop * length(each_idx))
+    col_idx <- gt$idx
+
+    list(rowIdx = row_idx, colIdx = col_idx)
+}
+
 
 ################################################################################
 # old functions
@@ -678,7 +728,7 @@ postSubSample.tightPCA <- function(subSampleSol, abThresh = 0.6, dQuant = 0.5)
 
 
 # Each row is a gene, each column is a different iteration
-getA <- function(bcSol, takeAbs = F)
+getA <- function(bcSol, takeAbs = T)
 {
     if (takeAbs)
         return( abs(sapply(bcSol, function (x) x$ab)) )

@@ -11,13 +11,25 @@ fw_ranks <- pps(fwbc, "rank_pca", "pca")
 fw_pca <- pps(fwbc, "pca", "pca")
 fw_hclust <- pps(fwbc, "hclust", "pca")
 
-x <- ggPlotSSSolution(fwbc)
-
-
 fw_h <- pps(fwbc, "rank_pca", "pca")
 
 fw_r <- pss_ranks(fwbc)
 fw_p <- pss_pca(fwbc)
+
+x <- ggPlotSSSolution(fwbc)
+
+################################################################################
+# new method of subsampling
+################################################################################
+
+
+p <- sccab_params(30, 10, ab_lam = c(0.0005, 0.001, 0.05), prop = 0.75)
+fw_sub <- sccab_sub(flyWorm, p, 10)
+
+debug(pps_sub)
+pps_sub(fw_sub, 0.6, nrow(flyWorm))
+
+hi <- pps_sub(fw_sub, 0.1, nrow(flyWorm))
 
 
 
