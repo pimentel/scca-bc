@@ -44,3 +44,63 @@ insert_matrix <- function(sub_matrix, row_start, col_start, bg_matrix)
 
     bg_matrix
 }
+
+#' Generate a matrix that is iid normal
+#'
+#' Generate a matrix that is iid normal
+#'
+#' @param nrows the number of rows
+#' @param ncols the number of cols
+#' @param mean the mean of each sample
+#' @param sd the standard devian of each sample
+#' @return a \code{matrix} of size nrows * ncols with iid samples from N(mean,
+#' sd)
+#' @export
+iid_gaussian_block <- function(nrows, ncols, mean, sd)
+{
+    matrix(rnorm(nrows * ncols, mean = mean, sd = sd),
+        nrow = nrows, ncol = ncols)
+}
+
+
+#' Generate a multivariate normal block
+#'
+#' Generate a multivariate normal block
+#'
+#' @param nrows the number of rows
+#' @param ncols the number of cols
+#' @param min the min number to pass to \link{\code{random_pos_def_mat}}
+#' @param max the max number to pass to \link{\code{random_pos_def_mat}}
+#' @return a multivariate normal with dimensions nrows * ncols
+#' @export
+mvn_block <- function(nrows = 30, ncols = 20, min = 0.5, max = 0.8)
+{
+    covMat <- random_pos_def_mat(nrows, min, max)
+    ranSamples <- MASS::mvrnorm(ncols, mu = rep(0, nrows), Sigma = covMat)
+    t(ranSamples)
+}
+
+#' Generate a random posisitive definite matrix
+#'
+#' Generate a random posisitive definite matrix
+#'
+#' @param nvars the number of variables
+#' @param min the minimum number to generate the covariance from
+#' @param max the maximum number to generate the covariance from
+#' @return a random positive definite matrix with diagonal 1
+#' @export
+random_pos_def_mat <- function(nvars = 10, min = 0.5, max = 0.8)
+{
+    correlations <- round(runif(round((nvars^2-nvars)/2),
+                                min = min, max = max), digits = 2)
+    # correlations <- sample(c(1, -1), length(correlations), replace = TRUE) * correlations
+    sig <- matrix(nrow = nvars, ncol = nvars)
+    diag(sig) <- 1 # common variance of 1
+    sig[upper.tri(sig)] <- correlations
+    sig[lower.tri(sig)] <- t(sig)[lower.tri(sig)]
+
+    # using Matrix package
+    sigNear <- Matrix::nearPD(sig)
+
+    cov2cor(as.matrix(sigNear$mat))
+}
