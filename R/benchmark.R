@@ -104,3 +104,27 @@ random_pos_def_mat <- function(nvars = 10, min = 0.5, max = 0.8)
 
     cov2cor(as.matrix(sigNear$mat))
 }
+
+
+#' Permute a matrix
+#'
+#' Randomly permute the rows and columns of a matrix.
+#'
+#' @param mat any object (usually a \code{matrix}) that accepts functions \code{nrow} and \code{ncol}
+#' @return a list with named elements:
+#' \itemize{
+#'  \item{"row_order"}{the order of the rows}
+#'  \item{col_order}{the order of the columns}
+#'  \item{permuted}{the permuted matrix}
+#'  \item{original}{the original matrix}
+#' }
+#' @seealso \code{\link{translate_idx}}
+permute_mat <- function(mat)
+{
+    row_order <- sample(nrow(mat))
+    col_order <- sample(ncol(mat))
+
+    list(row_order = row_order, col_order = col_order,
+            permuted = mat[row_order, col_order],
+            original = mat)
+}
