@@ -5,18 +5,18 @@ library(gplots)
 library(clusterGeneration) #genPositiveDefMat
 
 #' Function to generate normal noise and Gaussian blocks
-#' 
+#'
 #' @param nrow integer denoting the number of rows in the matrix
 #' @param ncol integer denoting the number of columns in the matrix
 #' @param noiseMean a mean for the background data
 #' @param noiseSD a standard deviation for the background data
 #' @param clusterOptions a list of lists. See examples.
 #' @return A matrix of size nrow x ncol with blocks in locations denoted by clusterOptions
-generateNormal <- function(nrow = 200, ncol = 40, noiseMean = 0, noiseSD = 1, 
+normal_block <- function(nrow = 200, ncol = 40, noiseMean = 0, noiseSD = 1,
                            clusterOptions)
 {
     # background noise
-    mat <- matrix(rnorm(nrow * ncol, mean = noiseMean, sd = noiseSD), 
+    mat <- matrix(rnorm(nrow * ncol, mean = noiseMean, sd = noiseSD),
                   nrow = nrow, ncol = ncol)
 
     # TODO: make sure clusterOptions are within coords
@@ -26,7 +26,7 @@ generateNormal <- function(nrow = 200, ncol = 40, noiseMean = 0, noiseSD = 1,
         clustNRows <- clust$y.end - clust$y.start + 1
         if ("data" %in% names(clust))
         {
-            mat[clust$x.start:clust$x.end, clust$y.start:clust$y.end] <- 
+            mat[clust$x.start:clust$x.end, clust$y.start:clust$y.end] <-
                 clust$data
         }
     }

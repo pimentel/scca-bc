@@ -1,3 +1,24 @@
+#' Constructor for biclustering result
+#'
+#' Given a vector of rows and a vector of columns, turn it into a formal SCCAB
+#' \code{pps_sol} result.
+#'
+#' @param rows an \code{integer} vector of rows in the bicluster
+#' @param cols an \code{integer} vector of columns in the bicluster
+#' @return A \code{pps_sol} object, which is essentially a named list with
+#' \describe{
+#'  \item{row_idx}{The indices of the rows}
+#'  \item{col_idx}{The indices of the columns}
+#' }
+#' @seealso \code{\link{pps}}, \code{\link{pps_sub}}, \code{\link{get_pps}}
+pps_sol <- function(rows, cols)
+{
+    if (!is(rows, "integer") || !is(cols, "integer"))
+        stop("'rows' and 'cols' must both be integer vectors")
+
+    structure(list(row_idx = rows, col_idx = cols), class = "pps_sol")
+}
+
 #' @export
 pps <- function(s_res, row_mode, col_mode)
 {
