@@ -30,7 +30,7 @@ pps <- function(s_res, row_mode, col_mode)
     col_idx <- col_func(s_res$D)
 
 
-    list(rowIdx = row_idx, colIdx = col_idx)
+    list(list(rowIdx = row_idx$idx, colIdx = col_idx$idx))
 }
 
 # TODO: write docs
@@ -200,9 +200,9 @@ bootStrapNAs <- function(dat, lwr, upr)
 count_index <- function(idx)
 {
     counts <- reshape2::melt(idx) %>%
-        group_by(value) %>%
-        summarise(count = length(value)) %>%
-        rename(index = value)
+        dplyr::group_by(value) %>%
+        dplyr::summarise(count = length(value)) %>%
+        dplyr::rename(index = value)
 
     counts
 }

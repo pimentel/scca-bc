@@ -62,20 +62,20 @@ mean_absolute_tol <- function(old, new)
 #' @export
 jaccard_idx_matrix <- function(truthList, predList)
 {
-    expandCells <- function(aList)
-    {
-        aCat <- expand.grid(aList$rowIdx, aList$colIdx)
-        paste(aCat[,1], aCat[,2], sep = ".")
-    }
-    mean(sapply(truthList, function(truth)
-           {
-               truthCat <- expandCells(truth)
-               max(sapply(predList, function(prediction)
-                      {
-                          predCat <- expandCells(prediction)
-                          numerator <- length(intersect(truthCat, predCat))
-                          denominator <- length(union(truthCat, predCat))
-                          numerator / denominator
-                      }))
-           }))
+  expandCells <- function(aList)
+  {
+    aCat <- expand.grid(aList$rowIdx, aList$colIdx)
+    paste(aCat[,1], aCat[,2], sep = ".")
+  }
+  mean(sapply(truthList, function(truth)
+      {
+        truthCat <- expandCells(truth)
+        max(sapply(predList, function(prediction)
+            {
+              predCat <- expandCells(prediction)
+              numerator <- length(intersect(truthCat, predCat))
+              denominator <- length(union(truthCat, predCat))
+              numerator / denominator
+            }))
+      }))
 }

@@ -128,3 +128,23 @@ permute_mat <- function(mat)
             permuted = mat[row_order, col_order],
             original = mat)
 }
+
+#' Compute sccab over a bunch of simulations
+#'
+#' Compute sccab over a bunch of simulations and get back their results.
+#'
+#' @param data A named list containing \code{sims}, a list of simulations
+#' @param sccab_func currently not used, a function to call sccab_with
+#' @param params a \code{sccab_params} object
+#' @return a list of \code{sccab} results
+#' @export
+sccab_sims <- function(sccab_sim, sccab_func, params) {
+  stopifnot(is(sccab_sim, "sccab_sim"))
+
+  lapply(seq_along(sccab_sim$sims), function(i)
+    {
+      cat("sccab_sims: ", i, "\n")
+      cur_sim <- sccab_sim$sims[[i]]
+      sccab(cur_sim, params)
+    })
+}

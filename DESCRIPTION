@@ -13,6 +13,7 @@ Imports:
     gplots (>= 2.14.2),
     cluster (>= 1.15.3),
     fscca (>= 0.1.0),
+    dplyr,
     Matrix
 LinkingTo: Rcpp
 Suggests:

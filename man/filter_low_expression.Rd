@@ -4,14 +4,14 @@
 \alias{filter_low_expression}
 \title{Filter out rows and columns with low expression}
 \usage{
-filter_low_expression(data, min_exp, min_percent)
+filter_low_expression(data, min_exp, max_cols)
 }
 \arguments{
 \item{data}{the matrix to filter}
 
 \item{min_exp}{the minimum expression in each row}
 
-\item{min_percent}{the minimum percentage of the rows}
+\item{max_cols}{the maximum number of cols that can have \code{min_exp}}
 }
 \description{
 Filter out rows and columns with low expression
