@@ -15,15 +15,6 @@ gen_high_cor <- function(n_samps) {
     class = c("sccab_high_cor", "sccab_sim"))
 }
 
-
-bg_matrix <- iid_gaussian_block(nrows = 1500, ncols = 100, mean = 0, sd = 1)
-cur_mvn <- mvn_block(nrows = 300, ncols = 30, min = 0.72, max = 0.94)
-sim_data <- insert_matrix(cur_mvn, 1, 1, bg_matrix)
-
-res <- sccab(sim_data, params)
-
-truth <- list(list(rowIdx = 1:300, colIdx = 1:30))
-
 p_res <- pps(res, "hclust", "hclust")
 jaccard_idx_matrix(p_res, truth)
 

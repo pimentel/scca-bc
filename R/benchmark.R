@@ -138,7 +138,7 @@ permute_mat <- function(mat)
 #' @param params a \code{sccab_params} object
 #' @return a list of \code{sccab} results
 #' @export
-sccab_sims <- function(sccab_sim, sccab_func, params) {
+sccab_sims <- function(sccab_sim, params) {
   stopifnot(is(sccab_sim, "sccab_sim"))
 
   lapply(seq_along(sccab_sim$sims), function(i)
