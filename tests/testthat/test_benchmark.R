@@ -13,3 +13,12 @@ test_that("Insert matrix",
 
         expect_error(insert_matrix(ins, 10, 2, bg))
     })
+
+test_that("permuting a matrix",
+  {
+    mat <- matrix(1:100, nrow = 20)
+    set.seed(42)
+    pm <- permute_mat(mat)
+    expect_false(identical(mat, pm$permuted))
+    expect_equal(unpermute_mat(pm$permuted, pm), mat)
+  })

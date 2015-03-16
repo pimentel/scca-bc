@@ -4,14 +4,14 @@
 \alias{sccab_sims}
 \title{Compute sccab over a bunch of simulations}
 \usage{
-sccab_sims(sccab_sim, sccab_func, params)
+sccab_sims(sccab_sim, params)
 }
 \arguments{
-\item{sccab_func}{currently not used, a function to call sccab_with}
-
 \item{params}{a \code{sccab_params} object}
 
 \item{data}{A named list containing \code{sims}, a list of simulations}
+
+\item{sccab_func}{currently not used, a function to call sccab_with}
 }
 \value{
 a list of \code{sccab} results

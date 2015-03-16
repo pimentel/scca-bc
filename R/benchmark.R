@@ -119,6 +119,7 @@ random_pos_def_mat <- function(nvars = 10, min = 0.5, max = 0.8)
 #'  \item{original}{the original matrix}
 #' }
 #' @seealso \code{\link{translate_idx}}
+#' @export
 permute_mat <- function(mat)
 {
     row_order <- sample(nrow(mat))
@@ -127,6 +128,26 @@ permute_mat <- function(mat)
     list(row_order = row_order, col_order = col_order,
             permuted = mat[row_order, col_order],
             original = mat)
+}
+
+#' Unpermute a matrix
+#'
+unpermute_mat <- function(mat, pm_obj) {
+  res <- matrix(0.0, nrow = nrow(mat), ncol = ncol(mat))
+  res[pm_obj$row_order, pm_obj$col_order] <- mat
+
+  res
+}
+
+#' @export
+translate_solution <- function(sol, pm_obj) {
+  lapply(sol, function(s)
+    {
+      list(
+        rowIdx = sort(translate_idx(pm_obj$row_order, s$rowIdx)),
+        colIdx = sort(translate_idx(pm_obj$col_order, s$colIdx))
+        )
+    })
 }
 
 #' Compute sccab over a bunch of simulations
@@ -145,6 +166,6 @@ sccab_sims <- function(sccab_sim, params) {
     {
       cat("sccab_sims: ", i, "\n")
       cur_sim <- sccab_sim$sims[[i]]
-      sccab(cur_sim, params)
+      sccab(cur_sim$permuted, params)
     })
 }
